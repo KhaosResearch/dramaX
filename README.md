@@ -34,7 +34,7 @@ python -m pip install -e .
 
 ## Usage
 
-Create a `.env.local` file similar to [`.env.example`](.env.example) and fill in the values. A full list of configuration variables can be found in [`dramax/settings.py`](dramax/settings.py).
+Create a `.env.local` file similar to [`.env.example`](.env.example) and fill in the values. A full list of configuration variables can be found in [`dramax/settings.py`](src/dramax/settings.py).
 Then, you can run the command line client tool:
 
 ```console
