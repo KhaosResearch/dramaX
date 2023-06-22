@@ -10,13 +10,13 @@ build:
 	@python -m build
 
 format:
-	@python -m black src/ examples/
+	@python -m black src/ tests/ examples/
 
 lint:
-	@python -m ruff src/ examples/
+	@python -m ruff src/ tests/ examples/
 
 static-check:
-	@python -m mypy src/
+	@python -m mypy src/ tests/
 
 tests:
-	@python -m pytest src/
+	@python -m pytest
