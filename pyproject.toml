@@ -1,0 +1,80 @@
+[project]
+name = "dramax"
+description = "dramaX is a Python library for orchestrating distributed tasks."
+readme = "README.md"
+requires-python = ">=3.7"
+authors = [
+    { name = "Khaos Research Group", email = "khaos.research@gmail.com" },
+]
+classifiers=[
+    "Intended Audience :: Information Technology",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python",
+    "Typing :: Typed",
+]
+dependencies = [
+    "fastapi>=0.97.0",
+    "pydantic[dotenv]>=1.10.5",
+    "structlog>=23.1.0",
+    "uvicorn>=0.22.0",
+    "requests>=2.31.0",
+    "dramatiq[rabbitmq,watch]>=1.14.2",
+    "pymongo>=4.3.3",
+    "minio>=7.1.15",
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+complete = ["black", "mypy", "ruff", "pytest"]
+
+[project.scripts]
+dramax = "dramax.__main__:cli"
+
+[tool.black]
+line-length = 120
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+[tool.ruff]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "C",  # flake8-comprehensions
+    "B",  # flake8-bugbear
+]
+ignore = [
+    "E501",  # line too long, handled by black
+    "B008",  # do not perform function calls in argument defaults (`Depends`)
+    "C901",  # too complex
+]
+
+[tool.hatch.version]
+path = "src/dramax/__init__.py"
+
+[tool.mypy]
+check_untyped_defs = true
+ignore_errors = false
+ignore_missing_imports = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_unreachable = true
+warn_unused_configs = true
+pretty = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
