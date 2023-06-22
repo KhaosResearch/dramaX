@@ -1,10 +1,9 @@
 # [dramaX](https://github.com/KhaosResearch/dramaX) 
 
 ![CI](https://github.com/KhaosResearch/dramaX/actions/workflows/ci.yml/badge.svg)
-![Release](https://github.com/KhaosResearch/dramaX/actions/workflows/release.yml/badge.svg)
 ![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)
 
-`dramaX` is an distributed workflow runner for Python. 
+`dramaX` is a distributed workflow runner for Python.
 
 ## Getting Started
 
