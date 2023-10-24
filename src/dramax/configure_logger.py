@@ -1,9 +1,9 @@
-import structlog
 
 
 def configure_logger() -> None:
     """
     Initialize the structured logger with the desired processors.
+    """
     """
     processors = [
         structlog.contextvars.merge_contextvars,
@@ -15,3 +15,5 @@ def configure_logger() -> None:
         structlog.processors.JSONRenderer(),
     ]
     structlog.configure(processors=processors)
+    """
+    pass

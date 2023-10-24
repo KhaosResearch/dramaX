@@ -4,30 +4,32 @@ from dramax.worker.scheduler import Scheduler
 
 tasks = [
     Task(
-        name="t1",
+        id="t1",
+        name="first_task",
         image="busybox",
         parameters=[
             {
                 "name": "wget",
-                "value": "-P /mnt/outputs https://raw.githubusercontent.com/solidsnack/tsv/master/cities10.tsv",
+                "value": "-P /mnt/shared/ https://raw.githubusercontent.com/solidsnack/tsv/master/cities10.tsv",
             }
         ],
         outputs=[
             {
-                "name": "cities10.tsv",
+                "path": "/mnt/shared/cities10.tsv",
             }
         ],
     ),
     Task(
-        name="t2",
+        id="t2",
+        name="second_task",
         image="busybox",
-        parameters=[{"name": "cat", "value": "/mnt/inputs/df.tsv"}],
+        parameters=[{"name": "cat", "value": "/mnt/shared/cities10.tsv"}],
         inputs=[
             {
-                "path": "t1/outputs/cities10.tsv",
-                "name": "df.tsv",
+                "path": "/mnt/shared/cities10.tsv",
             }
         ],
+        depends_on=["t1"],
     ),
 ]
 
@@ -39,5 +41,5 @@ workflow = Workflow(
 print("Workflow JSON:")
 print(workflow.json(indent=2))
 
-with Scheduler() as scheduler:
-    scheduler.run(workflow)
+scheduler = Scheduler()
+scheduler.run(workflow)

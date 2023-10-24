@@ -6,16 +6,11 @@
 
 `dramaX` is a distributed workflow runner for Python.
 
+It uses [RabbitMQ](https://www.rabbitmq.com) as a message broker and [Dramatiq](https://dramatiq.io) as a task queue.
+
 ## Getting Started
 
 ### Prerequisites
-
-To set up `dramaX` you will need:
-
-* Docker
-* RabbitMQ
-* Mongodb
-* MinIO
 
 You can set up a minimal development environment using `docker compose`:
 
@@ -38,7 +33,7 @@ python -m pip install -e .
 Create a `.env.local` file similar to [`.env.example`](.env.example) and fill in the values. A full list of configuration variables can be found in [`dramax/settings.py`](src/dramax/settings.py).
 Then, you can run the command line client tool:
 
-```console
+```sh
 dramax -h
 ```
 
@@ -46,7 +41,7 @@ dramax -h
 
 Server can be [deployed](https://fastapi.tiangolo.com/deployment/) with *uvicorn*, a lightning-fast ASGI server, using the command-line client tool:
 
-```console
+```sh
 dramax server
 ```
 
@@ -56,7 +51,7 @@ Online documentation will be available at [`/api/docs`](http://0.0.0.0:8001/api/
 
 Workers execute tasks in the background. They can be spawned using the command-line client tool:
 
-```console
+```sh
 dramax worker --processes 1
 ```
 

@@ -82,7 +82,7 @@ app.include_router(router, prefix="/api/v2/workflow")
 
 
 def run_server():
-    log.info(f"Deploying server at https://{settings.api_host}:{settings.api_port}")
+    log.info(f"Deploying server at http://{settings.api_host}:{settings.api_port}")
     uvicorn.run(
         app,
         host=settings.api_host,

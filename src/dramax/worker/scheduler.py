@@ -8,7 +8,7 @@ from structlog import get_logger
 
 from dramax.database import get_mongo
 from dramax.manager import TaskManager, WorkflowManager
-from dramax.models.task import Task, Status
+from dramax.models.task import Status, Task
 from dramax.models.workflow import Workflow, WorkflowInDatabase, WorkflowStatus
 from dramax.settings import settings
 from dramax.worker import set_failure, worker
@@ -23,6 +23,9 @@ class Scheduler:
         """
         Execute workflow.
         """
+        # Create workflow in database. We split this from the task creation
+        # so that we can have a workflow in the database before any task is
+        # created.
         WorkflowManager(self.db).create_or_update_from_id(
             workflow.id,
             metadata=workflow.metadata.dict(),
@@ -30,71 +33,51 @@ class Scheduler:
             status=WorkflowStatus.STATUS_PENDING,
         )
 
-        # Add workflow metadata to tasks.
         for task in workflow.tasks:
             task.metadata.update(workflow.metadata.dict())
 
         inverted_index = {}
         for task in workflow.tasks:
-            inverted_index[task.name] = task
+            inverted_index[task.id] = task
 
-        # Enqueue tasks in execution order.
         sorted_tasks = self.sorted_tasks(workflow)
         if len(sorted_tasks) != len(workflow.tasks):
-            raise ValueError("Some tasks have missing dependencies.")
-        for name in sorted_tasks:
-            self.enqueue(task=inverted_index[name], workflow_id=workflow.id)
+            raise ValueError("Some tasks are missing")
+
+        for id in sorted_tasks:
+            self.enqueue(task=inverted_index[id], workflow_id=workflow.id)
 
     def enqueue(self, task: Task, workflow_id: str):
-        """
-        Send task request to main `dramax` actor.
-        """
+        task_id = task.id
         task_dict = task.dict()
+        self.log.debug("Enqueuing task", task_id=task_id, workflow_id=workflow_id)
 
-        self.log.debug("Enqueuing task", task=task_dict, workflow_id=workflow_id)
+        TaskManager().create_or_update_from_id(
+            task_id,
+            parent=workflow_id,
+            created_at=datetime.now(),
+            status=Status.STATUS_PENDING,
+            **task_dict,
+        )
 
-        # Triggers actor execution and sets failure callback.
         message = worker.message_with_options(
             args=(task_dict, workflow_id),
             on_failure=set_failure,
+            # options are passed to the actor, including on_failure.
+            options={"task_id": task_id, "workflow_id": workflow_id},
         )
 
         # Determines where to send the message (queue) based on task options.
         queue_name = task.options.queue_name or settings.default_actor_opts.queue_name
         message = message.copy(queue_name=queue_name)
 
-        # Actually enqueues the message.
         broker = RabbitmqBroker(url=settings.rabbit_dns)
-        message = broker.enqueue(message)
-
-        # Creates task in database.
-        task_id = message.message_id
-        TaskManager().create_or_update_from_id(
-            task_id,
-            name=task.name,
-            label=task.label,
-            parent=workflow_id,
-            image=task.image,
-            parameters=[param.dict() for param in task.parameters],
-            inputs=task.inputs,
-            outputs=task.outputs,
-            options=task.options.dict(),
-            metadata=task.metadata,
-            status=Status.STATUS_PENDING,
-            created_at=datetime.now(),
-        )
-        self.log.debug("Task created", task_id=task_id, workflow_id=workflow_id)
+        broker.enqueue(message)
 
     def status(self, workflow_id: str) -> WorkflowInDatabase:
         workflow = WorkflowManager(self.db).find_one(id=workflow_id)
         workflow.tasks = TaskManager(self.db).find(parent=workflow_id)
         return workflow
-
-    def revoke(self, workflow_id: str) -> None:
-        """
-        Cancel workflow execution.
-        """
-        WorkflowManager().create_or_update_from_id(workflow_id, updated_at=datetime.now(), is_revoked=True)
 
     @staticmethod
     def sorted_tasks(workflow: Workflow) -> list:
@@ -120,19 +103,11 @@ class Scheduler:
 
         for task in workflow.tasks:
             if not task.inputs:
-                sources.append(task.name)
+                sources.append(task.id)
             else:
-                for task_input in task.inputs:
-                    task_input_name = task_input["path"].split("/")[0]
-                    # TODO: Check if task_input_name is in workflow.tasks.
-                    graph[task_input_name].append(task.name)
+                for depends_on in task.depends_on:
+                    graph[depends_on].append(task.id)
 
         ordered_workflow_tasks = iterative_topological_sort(graph, sources)
 
         return ordered_workflow_tasks
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        pass

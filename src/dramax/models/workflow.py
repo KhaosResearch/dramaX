@@ -10,12 +10,11 @@ from dramax.models.task import Task, TaskInDatabase
 
 
 class WorkflowStatus(str, Enum):
-    STATUS_UNKNOWN: str = "UNKNOWN"
-    STATUS_REVOKED: str = "REVOKED"
-    STATUS_PENDING: str = "PENDING"
-    STATUS_RUNNING: str = "RUNNING"
-    STATUS_FAILED: str = "FAILED"
-    STATUS_DONE: str = "DONE"
+    STATUS_REVOKED: str = "revoked"
+    STATUS_PENDING: str = "pending"
+    STATUS_RUNNING: str = "running"
+    STATUS_FAILED: str = "failure"
+    STATUS_DONE: str = "success"
 
 
 class WorkflowMetadata(BaseModel):
@@ -26,27 +25,28 @@ class WorkflowMetadata(BaseModel):
 
 
 class Workflow(BaseModel):
-    id: str = Field(default_factory=lambda: "wf-" + uuid.uuid4().hex[:8])
+    id: str = Field(default_factory=lambda: "workflow-" + uuid.uuid4().hex[:8])
     label: str = ""
     tasks: List[Task] = []
     metadata: WorkflowMetadata = WorkflowMetadata()
 
     @validator("tasks")
-    def task_names_not_duplicated(cls, v):
-        names = [v.name for v in v]
-        assert len(set(names)) == len(names), "Found duplicated tasks names in workflow"
+    def task_ids_not_duplicated(cls, v):
+        ids = [v.id for v in v]
+        assert len(set(ids)) == len(ids), "Found duplicated IDs in workflow"
         return v
 
 
 class WorkflowInDatabase(BaseModel):
-    id: str
-    label: str = ""
     tasks: List[TaskInDatabase] = []
-    metadata: dict = {}
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
-    status: WorkflowStatus = WorkflowStatus.STATUS_UNKNOWN
+    status: WorkflowStatus = WorkflowStatus.STATUS_PENDING
     is_revoked: bool = False
 
     class Config:
         use_enum_values = True
+
+
+class ExecutionId(BaseModel):
+    id: str

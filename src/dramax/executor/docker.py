@@ -9,7 +9,7 @@ def run_container(image: str, parameters: Optional[dict], local_dir: str) -> str
 
     :param image: The docker image to run.
     :param parameters: The parameters to pass to the docker image.
-    :param local_dir: The local directory to mount as /mnt in the container.
+    :param local_dir: The local directory to mount in the container.
     :return: The logs of the container.
     """
     client = docker.from_env()
@@ -25,7 +25,7 @@ def run_container(image: str, parameters: Optional[dict], local_dir: str) -> str
 
     container = client.containers.run(
         image=image,
-        volumes={local_dir: {"bind": "/mnt", "mode": "rw"}},
+        volumes={local_dir: {"bind": "/mnt/shared", "mode": "rw"}},
         command=create_cmd_string(),
         detach=True,
         tty=True,
@@ -37,6 +37,6 @@ def run_container(image: str, parameters: Optional[dict], local_dir: str) -> str
     container.remove(v=True)
 
     if result["StatusCode"] != 0:
-        raise Exception("Container failed to run.")
+        raise Exception("Container failed to run: " + logs)
 
     return logs

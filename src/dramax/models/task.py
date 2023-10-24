@@ -1,16 +1,17 @@
+import uuid
 from datetime import datetime
 from enum import Enum
 from typing import Any, List, Optional
 
 from pydantic import BaseModel, validator
+from pydantic.fields import Field
 
 
 class Status(str, Enum):
-    STATUS_UNKNOWN: str = "UNKNOWN"
-    STATUS_PENDING: str = "PENDING"
-    STATUS_RUNNING: str = "RUNNING"
-    STATUS_FAILED: str = "FAILED"
-    STATUS_DONE: str = "DONE"
+    STATUS_PENDING: str = "pending"
+    STATUS_RUNNING: str = "running"
+    STATUS_FAILED: str = "failure"
+    STATUS_DONE: str = "success"
 
 
 class Result(BaseModel):
@@ -27,8 +28,12 @@ class Options(BaseModel):
 
 class Parameter(BaseModel):
     name: str
-    default_value: Any = None
     value: Any
+
+
+class File(BaseModel):
+    name: Optional[str] = None
+    path: str
 
 
 class Task(BaseModel):
@@ -36,14 +41,16 @@ class Task(BaseModel):
     Represents a task request.
     """
 
+    id: str = Field(default_factory=lambda: "task-" + uuid.uuid4().hex[:8])
     name: str
-    label: str = ""
+    label: str = "latest"
     image: str
     parameters: List[Parameter] = []
-    inputs: list = []
-    outputs: list = []
+    inputs: List[File] = []
+    outputs: List[File] = []
     options: Options = Options()
     metadata: dict = {}
+    depends_on: List[str] = []
 
     @validator("name")
     def name_does_not_contain_spaces(cls, v):
@@ -55,30 +62,17 @@ class Task(BaseModel):
         assert "." not in v, "name must not contain dots"
         return v
 
-    @validator("inputs")
-    def input_values_does_not_form_valid_identifier(cls, v):
-        assert all(["/" in v["path"] for v in v]), "inputs values must form valid identifier: taskName/rest/of/path"
-        return v
-
 
 class TaskInDatabase(Task):
     """
     Represents a task in the database.
     """
 
-    id: str
-    name: str
-    parent: str
-    image: str
-    parameters: list = []
-    inputs: list = []
-    outputs: list = []
-    options: Options = Options()
-    metadata: dict = {}
+    parent: str  # workflow id
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     result: Optional[Result] = None
-    status: Status = Status.STATUS_UNKNOWN
+    status: Status = Status.STATUS_PENDING
 
     class Config:
         use_enum_values = True

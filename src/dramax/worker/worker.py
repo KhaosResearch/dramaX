@@ -25,93 +25,62 @@ log.info("Setting up RabbitMQ broker", url=settings.rabbit_dns)
 broker = RabbitmqBroker(url=settings.rabbit_dns)
 broker.add_middleware(CurrentMessage())
 
-retries = Retries(
-    max_retries=0
-)  # TODO: Retries assigns a new message ID to the task, which breaks the workflow. Fix this.
+retries = Retries(max_retries=0)
 broker.add_middleware(retries)
 
 dramatiq.set_broker(broker)
 
 log.info("Connected to queue", queue_name=settings.default_actor_opts.queue_name)
 
+s3_client = Minio(
+    settings.minio_endpoint,
+    access_key=settings.minio_access_key,
+    secret_key=settings.minio_secret_key,
+    secure=settings.minio_use_ssl,
+)
+
 log.info("Worker is ready")
 
 
 @dramatiq.actor(**settings.default_actor_opts.dict())
 def worker(task: dict, workflow_id: str):
-    """
-    Executes an arbitrary function defined by a task and updates its state.
-
-    :param task: Task execution request object.
-    :param workflow_id: Workflow ID.
-    """
     message = CurrentMessage.get_current_message()
 
-    log = get_logger()
-    log = log.bind(task_id=message.message_id, workflow_id=workflow_id)
-
-    log.info("Running task")
-
-    # Task options.
-    task_id = message.message_id
-    task_name = task["name"]
+    task_id = task["id"]
     task_author = task["metadata"]["author"]
-
-    # Docker options.
-    image = task["image"]
-    parameters = task.get("parameters")
-
-    # Files.
+    container_image = task["image"]
+    container_parameters = task.get("parameters")
     inputs = task.get("inputs", [])
     outputs = task.get("outputs", [])
 
-    time.sleep(5)
+    log = get_logger()
+    log = log.bind(message_id=message.message_id, task_id=task_id, workflow_id=workflow_id)
 
-    def check_upstream(workflow_id: str, task_input_names: set) -> bool:
-        statuses = []
+    log.info("Running task", task=task)
 
-        all_tasks_in_db = TaskManager().find(parent=workflow_id)
-        if not all_tasks_in_db:
-            raise ValueError(f"Tasks for workflow `{workflow_id}` not found")
+    time.sleep(1)
 
-        for task_in_db in all_tasks_in_db:
-            if task_in_db.name in task_input_names:
-                statuses.append(task_in_db.status)
+    # Check if upstream tasks have failed before running this task.
+    depends_on = task["depends_on"]
+    if depends_on:
+        log.debug("Checking upstream tasks")
+        tasks_in_db = TaskManager().find(parent=workflow_id)
+        for task_in_db in tasks_in_db:
+            if task_in_db.id in depends_on:
+                if task_in_db.status == Status.STATUS_FAILED:
+                    raise ValueError("Upstream task failed")
+                elif task_in_db.status == Status.STATUS_PENDING or task_in_db.status == Status.STATUS_RUNNING:
+                    # We abruptly stop the current task execution and enqueue it again.
+                    log.debug("Re-enqueueing task because upstream task is not done yet", depends_on=task_id)
+                    dramatiq.get_broker().enqueue(message)
+                    return
 
-        log.info("Upstream tasks statuses", statuses=statuses)
+    # Create local directory in which to store input and output files.
+    # This directory is mounted inside the container.
+    task_dir = Path(settings.data_dir, task_author, workflow_id, task_id)
+    task_dir.mkdir(parents=True, exist_ok=True)
 
-        if any([s == Status.STATUS_FAILED for s in statuses]):
-            raise ValueError("Upstream task failed")
-
-        return all([s == Status.STATUS_DONE for s in statuses])
-
-    # For now, we are using the input file names to determine the upstream tasks
-    # i.e. if the input file is `task1/file.txt`, then `task1` is an upstream task.
-    task_input_names = {i["path"].split("/")[0] for i in inputs}
-
-    log.info("Checking upstream tasks", task_input_names=task_input_names)
-
-    if task_input_names:
-        if not check_upstream(workflow_id, task_input_names):
-            log.info("Upstream tasks are pending, re-enqueuing task")
-            dramatiq.get_broker().enqueue(message)
-            return
-
-    # Otherwise, we can proceed with the execution.
-
-    temp_dir = settings.data_dir
-
-    local_dir = Path(temp_dir, task_author, workflow_id, task_name)
-    (local_dir / "inputs").mkdir(parents=True, exist_ok=True)
-    (local_dir / "outputs").mkdir(parents=True, exist_ok=True)
-
-    # Get inputs from S3.
-    s3_client = Minio(
-        settings.minio_endpoint,
-        access_key=settings.minio_access_key,
-        secret_key=settings.minio_secret_key,
-        secure=settings.minio_use_ssl,
-    )
+    log.debug("Created local directory", task_dir=task_dir)
 
     if not s3_client.bucket_exists(bucket_name=settings.minio_bucket):
         try:
@@ -120,43 +89,45 @@ def worker(task: dict, workflow_id: str):
             log.error("Unexpected error when creating bucket", error=e)
             raise
 
-    # Download inputs from S3.
-    for input_file in inputs:
-        # `input_file["path"]` is the path of the input file relative to the workflow directory.
-        object_name = str(Path(task_author, workflow_id, input_file["path"]))
-        log.debug("Downloading input file from S3", bucket_name=settings.minio_bucket, object_name=object_name)
-        s3_client.fget_object(
-            bucket_name=settings.minio_bucket,
-            object_name=object_name,
-            file_path=str(local_dir / "inputs" / input_file["name"]),
-        )
+    for artifact in inputs:
+        object_name = str(Path(task_author, workflow_id)) + artifact["path"]
+        file_path = str(task_dir) + artifact["path"]
 
-    log.debug("Running task", task_name=task_name)
+        log.debug("Downloading input file", object_name=object_name, file_path=file_path)
+
+        s3_client.fget_object(bucket_name=settings.minio_bucket, object_name=object_name, file_path=file_path)
+
+    log.debug("Running container", image=container_image, parameters=container_parameters)
 
     try:
-        set_running(message)
-        result: str = run_container(image=image, parameters=parameters, local_dir=str(local_dir))
+        set_running(task_id, workflow_id)
+        result = run_container(
+            image=container_image, parameters=container_parameters, local_dir=str(task_dir) + "/mnt/shared"
+        )
+        log.info("Result", result=result)
     except Exception as e:
         log.error("Unexpected exception was raised by actor", error=e)
         raise
 
-    # Upload outputs to S3.
-    for output_file in outputs:
-        object_name = str(Path(task_author, workflow_id, task_name, "outputs", output_file["name"]))
-        log.debug("Uploading output file to S3", bucket_name=settings.minio_bucket, object_name=object_name)
-        s3_client.fput_object(
-            bucket_name=settings.minio_bucket,
-            object_name=object_name,
-            file_path=str(local_dir / "outputs" / output_file["name"]),
-        )
+    for artifact in outputs:
+        object_name = str(Path(task_author, workflow_id)) + artifact["path"]
+        file_path = str(task_dir) + artifact["path"]
 
-    set_success(task_id, result)
+        if not Path(file_path).exists():
+            log.warning("Output file not found in task folder", file_path=file_path)
+            continue
 
-    log.info("Task finished", result=result)
+        log.debug("Uploading output file", object_name=object_name, file_path=file_path)
 
-    if local_dir.exists() and task["options"]["on_finish_remove_local_dir"]:
-        log.info("Deleting local directory", local_dir=local_dir)
-        shutil.rmtree(local_dir)
+        s3_client.fput_object(bucket_name=settings.minio_bucket, object_name=object_name, file_path=file_path)
+
+    set_success(task_id, workflow_id, result)
+
+    log.info("Task finished successfully")
+
+    if task_dir.exists() and task["options"]["on_finish_remove_local_dir"]:
+        log.info("Deleting local directory", local_dir=task_dir)
+        shutil.rmtree(task_dir)
 
 
 def set_workflow_run_state(workflow_id: str):
@@ -172,7 +143,7 @@ def set_workflow_run_state(workflow_id: str):
 
     task_status_only = []
     for task in tasks:
-        status = task.status.upper()
+        status = task.status
         task_status_only.append(status)
 
     def check(comp: Callable, stats: list) -> bool:
@@ -182,58 +153,50 @@ def set_workflow_run_state(workflow_id: str):
         workflow_status = WorkflowStatus.STATUS_REVOKED
     elif check(all, [Status.STATUS_DONE]):
         workflow_status = WorkflowStatus.STATUS_DONE
-    elif check(any, [Status.STATUS_FAILED]):
-        workflow_status = WorkflowStatus.STATUS_FAILED
     elif check(all, [Status.STATUS_PENDING]):
         workflow_status = WorkflowStatus.STATUS_PENDING
+    elif check(any, [Status.STATUS_FAILED]):
+        workflow_status = WorkflowStatus.STATUS_FAILED
     elif check(any, [Status.STATUS_PENDING]) and not check(any, [Status.STATUS_FAILED]):
         workflow_status = WorkflowStatus.STATUS_PENDING
     elif check(any, [Status.STATUS_RUNNING]) and not check(any, [Status.STATUS_FAILED]):
         workflow_status = WorkflowStatus.STATUS_RUNNING
     else:
-        workflow_status = WorkflowStatus.STATUS_UNKNOWN
+        workflow_status = WorkflowStatus.STATUS_PENDING
 
     WorkflowManager().create_or_update_from_id(
         workflow_id=workflow_id, updated_at=datetime.now(), status=workflow_status
     )
 
 
-def set_running(message: MessageProxy):
-    task_id = message.message_id
+def set_running(task_id: str, workflow_id: str):
     TaskManager().create_or_update_from_id(
-        message.message_id,
-        status=Status.STATUS_RUNNING,
+        task_id,
         updated_at=datetime.now(),
+        status=Status.STATUS_RUNNING,
     )
-    task_in_db = TaskManager().find_one(id=task_id)
-    set_workflow_run_state(workflow_id=task_in_db.parent)
+    set_workflow_run_state(workflow_id=workflow_id)
 
 
-def set_success(message_id: str, result_data: str):
-    task_id = message_id
+def set_success(task_id: str, workflow_id: str, result_data: str):
     task_result = Result(log=result_data)
     TaskManager().create_or_update_from_id(
-        message_id,
-        status=Status.STATUS_DONE,
+        task_id,
         updated_at=datetime.now(),
         result=task_result.dict(),
+        status=Status.STATUS_DONE,
     )
-    task_in_db = TaskManager().find_one(id=task_id)
-    set_workflow_run_state(workflow_id=task_in_db.parent)
+    set_workflow_run_state(workflow_id=workflow_id)
 
 
 @dramatiq.actor(queue_name=settings.default_actor_opts.queue_name)
-def set_failure(message: dict, exception_data):
-    """
-    Actor failure callback. Set task status to `FAILED` and append traceback.
-    """
-    task_id = message["message_id"]
+def set_failure(message: MessageProxy, exception_data: str):
+    actor_opts = message["options"]["options"]
     task_result = Result(message=exception_data)
     TaskManager().create_or_update_from_id(
-        task_id,
-        status=Status.STATUS_FAILED,
+        actor_opts["task_id"],
         updated_at=datetime.now(),
         result=task_result.dict(),
+        status=Status.STATUS_FAILED,
     )
-    task_in_db = TaskManager().find_one(id=task_id)
-    set_workflow_run_state(workflow_id=task_in_db.parent)
+    set_workflow_run_state(workflow_id=actor_opts["workflow_id"])
