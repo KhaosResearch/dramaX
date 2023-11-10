@@ -23,20 +23,25 @@ def run_container(image: str, parameters: Optional[dict], local_dir: str) -> str
             pairs.append(f"{parameter['name']} {parameter['value']}")
         return " ".join(pairs)
 
+    cmd_string = create_cmd_string()
     container = client.containers.run(
         image=image,
         volumes={local_dir: {"bind": "/mnt/shared", "mode": "rw"}},
-        command=create_cmd_string(),
+        command=cmd_string,
         detach=True,
         tty=True,
     )
     result = container.wait()
     logs = container.logs().decode("utf-8")
 
+    # Prepend the command string to the logs
+    logs = f"{cmd_string}\n{logs}"
+
     container.stop()
     container.remove(v=True)
 
     if result["StatusCode"] != 0:
-        raise Exception("Container failed to run: " + logs)
+        error_message = f"Container failed:\n{logs}"
+        raise Exception(error_message)
 
     return logs
