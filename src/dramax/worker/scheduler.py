@@ -44,15 +44,15 @@ class Scheduler:
         if len(sorted_tasks) != len(workflow.tasks):
             raise ValueError("Some tasks are missing")
 
-        for id in sorted_tasks:
-            self.enqueue(task=inverted_index[id], workflow_id=workflow.id)
+        for task_id in sorted_tasks:
+            self.enqueue(task=inverted_index[task_id], workflow_id=workflow.id)
 
     def enqueue(self, task: Task, workflow_id: str):
         task_id = task.id
         task_dict = task.dict()
         self.log.debug("Enqueuing task", task_id=task_id, workflow_id=workflow_id)
 
-        TaskManager().create_or_update_from_id(
+        TaskManager().create(
             task_id,
             parent=workflow_id,
             created_at=datetime.now(),

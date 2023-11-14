@@ -34,7 +34,7 @@ def run_container(image: str, parameters: Optional[dict], local_dir: str) -> str
     result = container.wait()
     logs = container.logs().decode("utf-8")
 
-    # Prepend the command string to the logs
+    # Prepend the command string to the logs.
     logs = f"{cmd_string}\n{logs}"
 
     container.stop()

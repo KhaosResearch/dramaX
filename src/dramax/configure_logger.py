@@ -1,5 +1,3 @@
-
-
 def configure_logger() -> None:
     """
     Initialize the structured logger with the desired processors.

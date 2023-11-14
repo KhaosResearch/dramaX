@@ -32,9 +32,17 @@ class TaskManager(BaseManager):
         if task_in_db:
             return TaskInDatabase(**task_in_db)
 
-    def create_or_update_from_id(self, task_id: str, **extra_fields):
+    def create(self, task_id: str, **extra_fields):
+        self.db.task.insert_one(
+            {
+                "id": task_id,
+                **extra_fields,
+            }
+        )
+
+    def create_or_update_from_id(self, task_id: str, workflow_id: str, **extra_fields):
         self.db.task.update_one(
-            {"id": task_id},
+            {"id": task_id, "parent": workflow_id},
             {"$set": extra_fields},
             upsert=True,
         )

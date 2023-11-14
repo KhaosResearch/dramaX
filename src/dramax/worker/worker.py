@@ -74,6 +74,8 @@ def worker(task: dict, workflow_id: str):
                     log.debug("Re-enqueueing task because upstream task is not done yet", depends_on=task_id)
                     dramatiq.get_broker().enqueue(message)
                     return
+                else:
+                    log.debug("Upstream task is done", upstream_task_id=task_in_db.id)
 
     # Create local directory in which to store input and output files.
     # This directory is mounted inside the container.
@@ -172,6 +174,7 @@ def set_workflow_run_state(workflow_id: str):
 def set_running(task_id: str, workflow_id: str):
     TaskManager().create_or_update_from_id(
         task_id,
+        workflow_id,
         updated_at=datetime.now(),
         status=Status.STATUS_RUNNING,
     )
@@ -182,6 +185,7 @@ def set_success(task_id: str, workflow_id: str, result_data: str):
     task_result = Result(log=result_data)
     TaskManager().create_or_update_from_id(
         task_id,
+        workflow_id,
         updated_at=datetime.now(),
         result=task_result.dict(),
         status=Status.STATUS_DONE,
@@ -192,11 +196,13 @@ def set_success(task_id: str, workflow_id: str, result_data: str):
 @dramatiq.actor(queue_name=settings.default_actor_opts.queue_name)
 def set_failure(message: MessageProxy, exception_data: str):
     actor_opts = message["options"]["options"]
+    workflow_id = actor_opts["workflow_id"]
     task_result = Result(message=exception_data)
     TaskManager().create_or_update_from_id(
         actor_opts["task_id"],
+        workflow_id,
         updated_at=datetime.now(),
         result=task_result.dict(),
         status=Status.STATUS_FAILED,
     )
-    set_workflow_run_state(workflow_id=actor_opts["workflow_id"])
+    set_workflow_run_state(workflow_id=workflow_id)
