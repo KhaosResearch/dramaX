@@ -92,7 +92,7 @@ def worker(task: dict, workflow_id: str):
             raise
 
     for artifact in inputs:
-        object_name = str(Path(task_author, workflow_id)) + artifact["path"]
+        object_name = str(Path(task_author, workflow_id, artifact["source"])) + artifact["path"]
         file_path = str(task_dir) + artifact["path"]
 
         log.debug("Downloading input file", object_name=object_name, file_path=file_path)
@@ -112,7 +112,7 @@ def worker(task: dict, workflow_id: str):
         raise
 
     for artifact in outputs:
-        object_name = str(Path(task_author, workflow_id)) + artifact["path"]
+        object_name = str(Path(task_author, workflow_id, task_id)) + artifact["path"]
         file_path = str(task_dir) + artifact["path"]
 
         if not Path(file_path).exists():

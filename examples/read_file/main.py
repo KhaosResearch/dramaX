@@ -27,6 +27,7 @@ tasks = [
         inputs=[
             {
                 "path": "/mnt/shared/cities10.tsv",
+                "source": "t1",
             }
         ],
         depends_on=["t1"],

@@ -33,6 +33,7 @@ class Parameter(BaseModel):
 
 class File(BaseModel):
     name: Optional[str] = None
+    source: Optional[str] = None
     path: str
 
 
@@ -41,7 +42,7 @@ class Task(BaseModel):
     Represents a task request.
     """
 
-    id: str = Field(default_factory=lambda: "task-" + uuid.uuid4().hex[:8])
+    id: str
     name: str
     label: str = "latest"
     image: str
