@@ -34,6 +34,7 @@ class Parameter(BaseModel):
 class File(BaseModel):
     name: Optional[str] = None
     source: Optional[str] = None
+    sourcePath: Optional[str] = None
     path: str
 
 

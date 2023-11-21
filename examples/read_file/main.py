@@ -23,11 +23,12 @@ tasks = [
         id="t2",
         name="second_task",
         image="busybox",
-        parameters=[{"name": "cat", "value": "/mnt/shared/cities10.tsv"}],
+        parameters=[{"name": "cat", "value": "/mnt/shared/input.tsv"}],
         inputs=[
             {
-                "path": "/mnt/shared/cities10.tsv",
+                "path": "/mnt/shared/input.tsv",
                 "source": "t1",
+                "sourcePath": "/mnt/shared/cities10.tsv",
             }
         ],
         depends_on=["t1"],

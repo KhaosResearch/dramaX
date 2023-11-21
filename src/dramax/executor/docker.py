@@ -24,9 +24,21 @@ def run_container(image: str, parameters: Optional[dict], local_dir: str) -> str
         return " ".join(pairs)
 
     cmd_string = create_cmd_string()
+
+    def create_volumes() -> dict:
+        """
+        Builds the volumes to mount in the container.
+        By default, volumes are `/mnt/inputs/`, `/mnt/outputs/` and `/mnt/shared/`.
+        """
+        return {
+            f"{local_dir}/mnt/inputs": {"bind": "/mnt/inputs/", "mode": "rw"},
+            f"{local_dir}/mnt/outputs": {"bind": "/mnt/outputs/", "mode": "rw"},
+            f"{local_dir}/mnt/shared": {"bind": "/mnt/shared/", "mode": "rw"},
+        }
+
     container = client.containers.run(
         image=image,
-        volumes={local_dir: {"bind": "/mnt/shared", "mode": "rw"}},
+        volumes=create_volumes(),
         command=cmd_string,
         detach=True,
         tty=True,

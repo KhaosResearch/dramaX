@@ -92,7 +92,7 @@ def worker(task: dict, workflow_id: str):
             raise
 
     for artifact in inputs:
-        object_name = str(Path(task_author, workflow_id, artifact["source"])) + artifact["path"]
+        object_name = str(Path(task_author, workflow_id, artifact["source"])) + artifact["sourcePath"]
         file_path = str(task_dir) + artifact["path"]
 
         log.debug("Downloading input file", object_name=object_name, file_path=file_path)
@@ -103,9 +103,7 @@ def worker(task: dict, workflow_id: str):
 
     try:
         set_running(task_id, workflow_id)
-        result = run_container(
-            image=container_image, parameters=container_parameters, local_dir=str(task_dir) + "/mnt/shared"
-        )
+        result = run_container(image=container_image, parameters=container_parameters, local_dir=str(task_dir))
         log.info("Result", result=result)
     except Exception as e:
         log.error("Unexpected exception was raised by actor", error=e)
