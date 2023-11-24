@@ -109,6 +109,22 @@ def worker(task: dict, workflow_id: str):
         log.error("Unexpected exception was raised by actor", error=e)
         raise
 
+    # Create log file
+    now = datetime.now()
+    dt_string = now.strftime("%d-%m-%Y-%H:%M:%S")
+    log_file_name = dt_string + "-log.txt"
+    file_path = str(task_dir / log_file_name)
+    with open(file_path, 'w') as f:
+        f.write(result or "There were no logs produced for this task.")
+
+    # Upload outputs to S3.
+    object_name = str(Path(task_author, workflow_id, task_id, log_file_name))
+    s3_client.fput_object(
+        bucket_name=settings.minio_bucket,
+        object_name=object_name,
+        file_path=file_path,
+    )
+
     for artifact in outputs:
         object_name = str(Path(task_author, workflow_id, task_id)) + artifact["path"]
         file_path = str(task_dir) + artifact["path"]
