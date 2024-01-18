@@ -27,7 +27,7 @@ dependencies = [
 dynamic = ["version"]
 
 [project.optional-dependencies]
-complete = ["black", "mypy", "ruff", "pytest"]
+complete = ["mypy", "ruff", "pytest"]
 
 [project.scripts]
 dramax = "dramax.__main__:cli"

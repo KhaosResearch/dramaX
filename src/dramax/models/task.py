@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Dict
 
 from pydantic import BaseModel, validator
 
@@ -46,7 +46,7 @@ class Task(BaseModel):
     label: str = "latest"
     image: str
     parameters: List[Parameter] = []
-    environment: dict[str, Any] = {}
+    environment: Dict[str, Any] = {}
     inputs: List[File] = []
     outputs: List[File] = []
     options: Options = Options()
