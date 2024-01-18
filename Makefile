@@ -10,7 +10,7 @@ build:
 	@python -m build
 
 format:
-	@python -m black src/ tests/ examples/
+	@python -m ruff format src/ tests/ examples/
 
 lint:
 	@python -m ruff src/ tests/ examples/

@@ -3,12 +3,15 @@ from typing import Optional
 import docker
 
 
-def run_container(image: str, parameters: Optional[dict], local_dir: str) -> str:
+def run_container(
+    image: str, parameters: Optional[dict], environment: Optional[dict], local_dir: str
+) -> str:
     """
     Runs a docker container with the given parameters.
 
     :param image: The docker image to run.
-    :param parameters: The parameters to pass to the docker image.
+    :param parameters: The parameters to pass to the container.
+    :param environment: The environment variables to pass to the container.
     :param local_dir: The local directory to mount in the container.
     :return: The logs of the container.
     """
@@ -40,6 +43,7 @@ def run_container(image: str, parameters: Optional[dict], local_dir: str) -> str
         image=image,
         volumes=create_volumes(),
         command=cmd_string,
+        environment=environment,
         detach=True,
         tty=True,
     )

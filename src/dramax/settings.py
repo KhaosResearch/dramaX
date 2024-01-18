@@ -26,7 +26,7 @@ class ActorOpts(BaseModel):
 
 
 class Settings(BaseSettings):
-    root_path: str = ""
+    base_path: str = ""
 
     api_host: str = "0.0.0.0"
     api_port: int = 8001
@@ -50,11 +50,18 @@ class Settings(BaseSettings):
 
     # Directory to store temporary files.
     # TODO: Use Path instead of str.
-    data_dir: str = str(Path("/tmp" if platform.system() == "Darwin" else tempfile.gettempdir()))
+    data_dir: str = str(
+        Path("/tmp" if platform.system() == "Darwin" else tempfile.gettempdir())
+    )
 
     class Config:
         # Later files in the list will take priority over earlier files.
-        env_file = [".env.local", ".env.prod", "/etc/dramax/.env.local", "/etc/dramax/.env.prod"]
+        env_file = [
+            ".env.local",
+            ".env.prod",
+            "/etc/dramax/.env.local",
+            "/etc/dramax/.env.prod",
+        ]
         for f in reversed(env_file):
             if Path(f).exists():
                 log.info("Loading environment variables from file", env_file=f)

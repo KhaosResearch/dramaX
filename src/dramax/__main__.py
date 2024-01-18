@@ -11,7 +11,9 @@ def get_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="dramax")
     subparsers = parser.add_subparsers(dest="command", help="dramaX sub-commands")
     subparsers.required = True
-    subparsers.add_parser("worker", help="Spawn multiple concurrent workers to process tasks")
+    subparsers.add_parser(
+        "worker", help="Spawn multiple concurrent workers to process tasks"
+    )
     subparsers.add_parser("server", help="Deploy server to serve API requests")
     return parser
 

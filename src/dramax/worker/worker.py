@@ -50,11 +50,14 @@ def worker(task: dict, workflow_id: str):
     task_author = task["metadata"]["author"]
     container_image = task["image"]
     container_parameters = task.get("parameters")
+    container_environment = task.get("environment")
     inputs = task.get("inputs", [])
     outputs = task.get("outputs", [])
 
     log = get_logger()
-    log = log.bind(message_id=message.message_id, task_id=task_id, workflow_id=workflow_id)
+    log = log.bind(
+        message_id=message.message_id, task_id=task_id, workflow_id=workflow_id
+    )
 
     log.info("Running task", task=task)
 
@@ -69,9 +72,15 @@ def worker(task: dict, workflow_id: str):
             if task_in_db.id in depends_on:
                 if task_in_db.status == Status.STATUS_FAILED:
                     raise ValueError("Upstream task failed")
-                elif task_in_db.status == Status.STATUS_PENDING or task_in_db.status == Status.STATUS_RUNNING:
+                elif (
+                    task_in_db.status == Status.STATUS_PENDING
+                    or task_in_db.status == Status.STATUS_RUNNING
+                ):
                     # We abruptly stop the current task execution and enqueue it again.
-                    log.debug("Re-enqueueing task because upstream task is not done yet", depends_on=task_id)
+                    log.debug(
+                        "Re-enqueueing task because upstream task is not done yet",
+                        depends_on=task_id,
+                    )
                     dramatiq.get_broker().enqueue(message)
                     return
                 else:
@@ -92,29 +101,45 @@ def worker(task: dict, workflow_id: str):
             raise
 
     for artifact in inputs:
-        object_name = str(Path(task_author, workflow_id, artifact["source"])) + artifact["sourcePath"]
+        object_name = (
+            str(Path(task_author, workflow_id, artifact["source"]))
+            + artifact["sourcePath"]
+        )
         file_path = str(task_dir) + artifact["path"]
 
-        log.debug("Downloading input file", object_name=object_name, file_path=file_path)
+        log.debug(
+            "Downloading input file", object_name=object_name, file_path=file_path
+        )
 
-        s3_client.fget_object(bucket_name=settings.minio_bucket, object_name=object_name, file_path=file_path)
+        s3_client.fget_object(
+            bucket_name=settings.minio_bucket,
+            object_name=object_name,
+            file_path=file_path,
+        )
 
-    log.debug("Running container", image=container_image, parameters=container_parameters)
+    log.debug(
+        "Running container", image=container_image, parameters=container_parameters
+    )
 
     try:
         set_running(task_id, workflow_id)
-        result = run_container(image=container_image, parameters=container_parameters, local_dir=str(task_dir))
+        result = run_container(
+            image=container_image,
+            parameters=container_parameters,
+            environment=container_environment,
+            local_dir=str(task_dir),
+        )
         log.info("Result", result=result)
     except Exception as e:
         log.error("Unexpected exception was raised by actor", error=e)
         raise
 
-    # Create log file
+    # Create and upload log file.
     now = datetime.now()
     dt_string = now.strftime("%d-%m-%Y-%H:%M:%S")
     log_file_name = dt_string + "-log.txt"
     file_path = str(task_dir / log_file_name)
-    with open(file_path, 'w') as f:
+    with open(file_path, "w") as f:
         f.write(result or "There were no logs produced for this task.")
 
     # Upload outputs to S3.
@@ -135,7 +160,11 @@ def worker(task: dict, workflow_id: str):
 
         log.debug("Uploading output file", object_name=object_name, file_path=file_path)
 
-        s3_client.fput_object(bucket_name=settings.minio_bucket, object_name=object_name, file_path=file_path)
+        s3_client.fput_object(
+            bucket_name=settings.minio_bucket,
+            object_name=object_name,
+            file_path=file_path,
+        )
 
     set_success(task_id, workflow_id, result)
 
@@ -152,7 +181,9 @@ def set_workflow_run_state(workflow_id: str):
     """
     workflow_in_db = WorkflowManager().find_one(id=workflow_id)
     if not workflow_in_db:
-        log.error("Workflow not found. This should not happen.", workflow_id=workflow_id)
+        log.error(
+            "Workflow not found. This should not happen.", workflow_id=workflow_id
+        )
         raise ValueError(f"Workflow `{workflow_id}` not found")
 
     tasks = TaskManager().find(parent=workflow_id)

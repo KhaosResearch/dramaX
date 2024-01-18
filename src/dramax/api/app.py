@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import Depends, FastAPI
+from fastapi import APIRouter, Depends, FastAPI
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.openapi.utils import get_openapi
 from starlette import status
@@ -32,7 +32,6 @@ app = FastAPI(
     title="dramaX API",
     description="",
     version=__version__,
-    root_path=settings.root_path,
     # Remove the default docs and redoc endpoints to avoid conflicts with the
     # custom ones below.
     docs_url=None,
@@ -48,8 +47,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+main_router = APIRouter()
 
-@app.get("/healthz", name="Health check", status_code=status.HTTP_200_OK, tags=["health"])
+
+@main_router.get(
+    "/healthz", name="Health check", status_code=status.HTTP_200_OK, tags=["health"]
+)
 async def health():
     """
     Health check endpoint. Useful for liveness and readiness probes.
@@ -57,7 +60,12 @@ async def health():
     return Response(status_code=status.HTTP_200_OK)
 
 
-@app.get("/api/openapi.json", tags=["documentation"], include_in_schema=False, dependencies=[Depends(get_api_key)])
+@main_router.get(
+    "/api/openapi.json",
+    tags=["documentation"],
+    include_in_schema=False,
+    dependencies=[Depends(get_api_key)],
+)
 async def get_open_api_endpoint():
     response = JSONResponse(
         get_openapi(
@@ -69,7 +77,12 @@ async def get_open_api_endpoint():
     return response
 
 
-@app.get("/api/docs", tags=["documentation"], include_in_schema=False, dependencies=[Depends(get_api_key)])
+@main_router.get(
+    "/api/docs",
+    tags=["documentation"],
+    include_in_schema=False,
+    dependencies=[Depends(get_api_key)],
+)
 async def get_documentation():
     response = get_swagger_ui_html(
         openapi_url=f"/api/openapi.json?{settings.api_key_name}={settings.api_key}",
@@ -78,15 +91,18 @@ async def get_documentation():
     return response
 
 
-app.include_router(router, prefix="/api/v2/workflow")
+main_router.include_router(router, prefix="/api/v2/workflow")
+
+app.include_router(main_router, prefix=settings.base_path)
 
 
 def run_server():
-    log.info(f"Deploying server at http://{settings.api_host}:{settings.api_port}")
+    log.info(
+        f"Deploying server at http://{settings.api_host}:{settings.api_port}{settings.base_path}"
+    )
     uvicorn.run(
         app,
         host=settings.api_host,
         port=settings.api_port,
-        root_path=settings.root_path,
         log_level="trace" if settings.api_debug else "critical",
     )

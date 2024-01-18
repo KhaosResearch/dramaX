@@ -1,10 +1,8 @@
-import uuid
 from datetime import datetime
 from enum import Enum
 from typing import Any, List, Optional
 
 from pydantic import BaseModel, validator
-from pydantic.fields import Field
 
 
 class Status(str, Enum):
@@ -48,6 +46,7 @@ class Task(BaseModel):
     label: str = "latest"
     image: str
     parameters: List[Parameter] = []
+    environment: dict[str, Any] = {}
     inputs: List[File] = []
     outputs: List[File] = []
     options: Options = Options()

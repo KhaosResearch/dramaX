@@ -27,7 +27,9 @@ def connect_to_mongo() -> MongoClient:
     try:
         client.server_info()
     except ServerSelectionTimeoutError as e:
-        raise ConnectionError(f"Could not connect to database with connection string {settings.mongo_dns}") from e
+        raise ConnectionError(
+            f"Could not connect to database with connection string {settings.mongo_dns}"
+        ) from e
     return client
 
 

@@ -24,8 +24,8 @@ async def run(workflow_request: Workflow) -> ExecutionId:
     Executes a collection of tasks.
     """
     log.debug("Getting workflow request", workflow_request=workflow_request)
-    scheduler = Scheduler()
     try:
+        scheduler = Scheduler()
         scheduler.run(workflow_request)
     except Exception as e:
         log.error("Error executing workflow", error=e)
@@ -51,7 +51,9 @@ async def status(
         workflow_in_db = WorkflowManager(db).find_one(id=id)
     except Exception as e:
         log.error("Error getting workflow status", id=id, error=e)
-        raise HTTPException(status_code=500, detail=f"Error getting workflow {id}") from e
+        raise HTTPException(
+            status_code=500, detail=f"Error getting workflow {id}"
+        ) from e
 
     if not workflow_in_db:
         raise HTTPException(status_code=404, detail=f"Workflow {id} not found")
@@ -75,6 +77,7 @@ async def cancel_or_revoke(
     """
     Revokes the execution of a workflow, i.e., cancel the execution of pending tasks.
     """
+    # TODO: Doesn't work yet.
     workflow = WorkflowManager(db).find_one(id=id)
     if not workflow:
         raise HTTPException(status_code=404, detail=f"Workflow {id} not found")
