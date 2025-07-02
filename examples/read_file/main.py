@@ -5,6 +5,7 @@ from dramax.worker.scheduler import Scheduler
 tasks = [
     Task(
         id="t1",
+        type="docker",
         name="first_task",
         image="busybox",
         parameters=[

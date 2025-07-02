@@ -28,6 +28,14 @@ cd dramaX
 python -m pip install -e .
 ```
 
+or if you are using uv:
+
+```bash
+git clone git@github.com:KhaosResearch/dramaX.git
+cd dramaX
+uv sync
+```
+
 ## Usage
 
 Create a `.env.local` file similar to [`.env.example`](.env.example) and fill in the values. A full list of configuration variables can be found in [`dramax/settings.py`](src/dramax/settings.py).

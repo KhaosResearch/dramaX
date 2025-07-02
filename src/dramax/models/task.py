@@ -1,7 +1,8 @@
 from datetime import datetime
 from enum import Enum
-from typing import Any, List, Optional, Dict
+from typing import Any, Dict, List, Optional
 
+from models.executor import Executor
 from pydantic import BaseModel, validator
 
 
@@ -37,14 +38,9 @@ class File(BaseModel):
 
 
 class Task(BaseModel):
-    """
-    Represents a task request.
-    """
-
     id: str
     name: str
-    label: str = "latest"
-    image: str
+    executor: Executor
     parameters: List[Parameter] = []
     environment: Dict[str, Any] = {}
     inputs: List[File] = []
