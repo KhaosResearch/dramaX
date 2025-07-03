@@ -4,7 +4,7 @@ import dramatiq
 from pymongo.database import Database
 
 from dramax.database import get_mongo
-from dramax.models.task import Status
+from dramax.models.task import Status, Task
 from dramax.models.workflow import TaskInDatabase, WorkflowInDatabase
 
 
@@ -52,12 +52,12 @@ class TaskManager(BaseManager):
 
     def check_upstream(
         self,
-        task: dict,
+        task: Task,
         workflow_id: str,
         message: dramatiq.Message[Any],
         log,  # noqa: ANN001
     ) -> None:
-        depends_on = task["depends_on"]
+        depends_on = task.depends_on
         if depends_on:
             log.debug("Checking upstream tasks")
             tasks_in_db = self.find(parent=workflow_id)
@@ -73,7 +73,7 @@ class TaskManager(BaseManager):
                         # We abruptly stop the current task execution and enqueue it again.
                         log.debug(
                             "Re-enqueueing task because upstream task is not done yet",
-                            depends_on=task["id"],
+                            depends_on=task.id,
                         )
                         dramatiq.get_broker().enqueue(message)
                         return

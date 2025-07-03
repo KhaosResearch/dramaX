@@ -12,12 +12,12 @@ tasks = [
             {
                 "name": "wget",
                 "value": "-P /mnt/shared/ https://raw.githubusercontent.com/solidsnack/tsv/master/cities10.tsv",
-            }
+            },
         ],
         outputs=[
             {
                 "path": "/mnt/shared/cities10.tsv",
-            }
+            },
         ],
     ),
     Task(
@@ -30,7 +30,7 @@ tasks = [
                 "path": "/mnt/shared/input.tsv",
                 "source": "t1",
                 "sourcePath": "/mnt/shared/cities10.tsv",
-            }
+            },
         ],
         depends_on=["t1"],
     ),

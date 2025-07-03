@@ -12,9 +12,9 @@ from dramatiq.middleware import CurrentMessage, Retries
 from minio import Minio
 from structlog import get_logger
 
-from dramax.executor.docker import run_container
 from dramax.manager import TaskManager, WorkflowManager
-from dramax.models.task import Result, Status
+from dramax.models.executor.docker import DockerExecutor
+from dramax.models.task import Result, Status, Task
 from dramax.models.workflow import WorkflowStatus
 from dramax.settings import settings
 
@@ -46,33 +46,38 @@ log.info("Worker is ready")
 def worker(task: dict, workflow_id: str) -> None:
     message = CurrentMessage.get_current_message()
 
-    task_id = task["id"]
-    task_author = task["metadata"]["author"]
-    inputs = task.get("inputs", [])
-    outputs = task.get("outputs", [])
+    # Conversion to Task to work easier
+    parsed_task = Task(**task)
 
-    if task["executor"]["type"] == "Docker":
-        container_parameters = task.get("parameters")
-        container_environment = task.get("environment")
-        container_image = task["image"]
+    log = get_logger()
+    log = log.bind(
+        message_id=message.message_id,
+        task_id=parsed_task.id,
+        workflow_id=workflow_id,
+    )
 
-        log = get_logger()
-        log = log.bind(
-            message_id=message.message_id,
-            task_id=task_id,
-            workflow_id=workflow_id,
-        )
+    log.info("Running task", task=parsed_task)  # ? Not sure about this  bef: .dict
 
-        log.info("Running task", task=task)
+    time.sleep(1)
 
-        time.sleep(1)
+    # Check if upstream tasks have failed before running this task.
+    TaskManager().check_upstream(
+        parsed_task,
+        workflow_id,
+        message,
+        log,
+    )  # * Moved to TaskManager Class
 
-        # Check if upstream tasks have failed before running this task. # ? Should this checking be in TaskManager Class
-        TaskManager().check_upstream(task, workflow_id, message, log)
-
+    if isinstance(parsed_task.executor, DockerExecutor):  # * Checked Docker Instance
         # Create local directory in which to store input and output files.
         # This directory is mounted inside the container.
-        task_dir = Path(settings.data_dir, task_author, workflow_id, task_id)
+        # TODO Check if it is necessary to move more things out
+        task_dir = Path(
+            settings.data_dir,
+            parsed_task.metadata.author,
+            workflow_id,
+            parsed_task.id,
+        )  # ? Actualizar metadata en pydantic
         task_dir.mkdir(parents=True, exist_ok=True)
 
         log.debug("Created local directory", task_dir=task_dir)
@@ -84,9 +89,9 @@ def worker(task: dict, workflow_id: str) -> None:
                 log.exception("Unexpected error when creating bucket", error=e)
                 raise
 
-        for artifact in inputs:
+        for artifact in parsed_task.inputs:
             object_name = (
-                str(Path(task_author, workflow_id, artifact["source"]))
+                str(Path(parsed_task.metadata.author, workflow_id, artifact["source"]))
                 + artifact["sourcePath"]
             )
             file_path = str(task_dir) + artifact["path"]
@@ -105,21 +110,21 @@ def worker(task: dict, workflow_id: str) -> None:
 
         log.debug(
             "Running container",
-            image=container_image,
-            parameters=container_parameters,
+            image=parsed_task.executor.image,
+            parameters=parsed_task.parameters,
         )
 
         try:
-            set_running(task_id, workflow_id)
-            result = run_container(  # TODO: THIS NEEDS TO BE CHANGED
-                image=container_image,
-                parameters=container_parameters,
-                environment=container_environment,
+            set_running(parsed_task.id, workflow_id)
+            result = parsed_task.run(  # * NEW EXECUTE METHOD DONE
+                image=parsed_task.executor.image,
+                parameters=parsed_task.parameters,
+                environment=parsed_task.executor.environment,
                 local_dir=str(task_dir),
             )
             log.info("Result", result=result)
         except Exception as e:
-            log.error("Unexpected exception was raised by actor", error=e)
+            log.exception("Unexpected exception was raised by actor", error=e)
             raise
 
         # Create and upload log file.
@@ -131,16 +136,16 @@ def worker(task: dict, workflow_id: str) -> None:
             f.write(result or "There were no logs produced for this task.")
 
         # Upload outputs to S3.
-        object_name = str(Path(task_author, workflow_id, task_id, log_file_name))
+        object_name = str(Path(parsed_task.metadata.author, workflow_id, parsed_task.id, log_file_name))
         s3_client.fput_object(
             bucket_name=settings.minio_bucket,
             object_name=object_name,
             file_path=file_path,
         )
 
-        for artifact in outputs:
+        for artifact in parsed_task.outputs:
             object_name = (
-                str(Path(task_author, workflow_id, task_id)) + artifact["path"]
+                str(Path(parsed_task.metadata.author, workflow_id, parsed_task.id)) + artifact["path"]
             )
             file_path = str(task_dir) + artifact["path"]
 
@@ -160,7 +165,7 @@ def worker(task: dict, workflow_id: str) -> None:
                 file_path=file_path,
             )
 
-        set_success(task_id, workflow_id, result)
+        set_success(parsed_task.id, workflow_id, result)
 
         log.info("Task finished successfully")
 

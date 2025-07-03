@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any
 
 import docker
 
@@ -8,13 +8,14 @@ from .base import Executor
 class DockerExecutor(Executor):
     image: str
     label: str = "latest"
-    environment: Dict[str, Any] = {}
+    environment: dict[str, Any]
     type: str = "docker"
 
+    @staticmethod
     def execute(
         image: str,
-        parameters: Optional[dict],
-        environment: Optional[dict],
+        parameters: dict | None,
+        environment: dict | None,
         local_dir: str,
     ) -> str:
         """
@@ -32,9 +33,10 @@ class DockerExecutor(Executor):
             """
             Builds the command to run in the container.
             """
-            pairs = []
-            for parameter in parameters:
-                pairs.append(f"{parameter['name']} {parameter['value']}")
+            pairs = [
+                f"{parameter['name']} {parameter['value']}"
+                for parameter in parameters
+            ]
             return " ".join(pairs)
 
         cmd_string = create_cmd_string()
