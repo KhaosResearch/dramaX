@@ -2,7 +2,7 @@
 name = "dramax"
 description = "dramaX is a Python library for orchestrating distributed tasks."
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = "==3.12.*"
 authors = [
     { name = "Khaos Research Group", email = "khaos.research@gmail.com" },
 ]
@@ -50,17 +50,21 @@ exclude = '''
 
 [tool.ruff]
 select = [
-    "E",  # pycodestyle errors
-    "W",  # pycodestyle warnings
-    "F",  # pyflakes
-    "I",  # isort
-    "C",  # flake8-comprehensions
-    "B",  # flake8-bugbear
+    "F",  # Pyflakes (errores básicos)
+    "E",  # Pycodestyle (estilo PEP8)
+    "W",  # Advertencias de pycodestyle
+    "B",  # Bugbear (posibles bugs comunes)
+    "S",  # Bandit (seguridad)
+    "I",  # isort (ordenar imports)
+    "ALL",  # fixme (TODO/FIXME)
 ]
 ignore = [
     "E501",  # line too long, handled by black
     "B008",  # do not perform function calls in argument defaults (`Depends`)
     "C901",  # too complex
+    "D",     # too much doc
+    "FA100",
+    "ANN003", # Annotation for **query
 ]
 
 [tool.hatch.version]
