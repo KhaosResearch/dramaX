@@ -2,7 +2,6 @@ from collections import defaultdict
 from datetime import datetime
 from typing import Optional
 
-from dramatiq.brokers.rabbitmq import RabbitmqBroker
 from pymongo.database import Database
 from structlog import get_logger
 
@@ -45,6 +44,7 @@ class Scheduler:
             raise ValueError("Some tasks are missing")
 
         for task_id in sorted_tasks:
+            print("ENQUEUING ", task_id)
             self.enqueue(task=inverted_index[task_id], workflow_id=workflow.id)
 
     def enqueue(self, task: Task, workflow_id: str):
@@ -59,20 +59,17 @@ class Scheduler:
             status=Status.STATUS_PENDING,
             **task_dict,
         )
-
-        message = worker.message_with_options(
+        self.log.info("Entering worker")
+        print("TASKS ENCOLADITAS ", task_dict)
+        worker.send_with_options(
             args=(task_dict, workflow_id),
             on_failure=set_failure,
-            # options are passed to the actor, including on_failure.
+            queue_name=task.options.queue_name
+            or settings.default_actor_opts.queue_name,
             options={"task_id": task_id, "workflow_id": workflow_id},
         )
-
-        # Determines where to send the message (queue) based on task options.
-        queue_name = task.options.queue_name or settings.default_actor_opts.queue_name
-        message = message.copy(queue_name=queue_name)
-
-        broker = RabbitmqBroker(url=settings.rabbit_dns)
-        broker.enqueue(message)
+        # broker.enqueue(message)
+        self.log.info("Finished worker")
 
     def status(self, workflow_id: str) -> WorkflowInDatabase:
         workflow = WorkflowManager(self.db).find_one(id=workflow_id)

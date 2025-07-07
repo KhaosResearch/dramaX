@@ -11,14 +11,15 @@ tasks = [
         parameters=[
             {
                 "name": "wget",
-                "value": "-P /mnt/shared/ https://raw.githubusercontent.com/solidsnack/tsv/master/cities10.tsv",
-            },
+                "value": "--output-document /mnt/shared/cities10.tsv https://raw.githubusercontent.com/solidsnack/tsv/master/cities10.tsv",
+            }
         ],
         outputs=[
             {
                 "path": "/mnt/shared/cities10.tsv",
             },
         ],
+        on_fail_remove_local_dir=False,
     ),
     Task(
         id="t2",
@@ -33,6 +34,7 @@ tasks = [
             },
         ],
         depends_on=["t1"],
+        on_fail_remove_local_dir=False,
     ),
 ]
 
@@ -41,8 +43,8 @@ workflow = Workflow(
     metadata={"author": "anonymous", "other-key": "other-value"},
 )
 
-print("Workflow JSON:")
-print(workflow.json(indent=2))
+# print("Workflow JSON:")
+# print(workflow.json(indent=2))
 
 scheduler = Scheduler()
 scheduler.run(workflow)

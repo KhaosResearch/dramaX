@@ -242,6 +242,7 @@ def set_success(task_id: str, workflow_id: str, result_data: str):
 
 @dramatiq.actor(queue_name=settings.default_actor_opts.queue_name)
 def set_failure(message: MessageProxy, exception_data: str):
+    print("HA FALLADO TU TAREA", message["options"]["traceback"])
     actor_opts = message["options"]["options"]
     workflow_id = actor_opts["workflow_id"]
     task_result = Result(message=exception_data)
