@@ -1,13 +1,17 @@
+import os
 from typing import Optional
 
 import docker
 
 
 def run_container(
-    image: str, parameters: Optional[dict], environment: Optional[dict], local_dir: str
+    image: str,
+    parameters: Optional[dict],
+    environment: Optional[dict],
+    local_dir: str,
 ) -> str:
     """
-    Runs a docker container with the given parameters.
+    Runs a docker container with the given parameters and uploads outputs to Minio.
 
     :param image: The docker image to run.
     :param parameters: The parameters to pass to the container.
@@ -16,6 +20,12 @@ def run_container(
     :return: The logs of the container.
     """
     client = docker.from_env()
+
+    local_dir = local_dir
+    print("LOCAL_DIR", local_dir)
+    os.makedirs(os.path.join(local_dir, "mnt", "shared"), exist_ok=True)
+    os.makedirs(os.path.join(local_dir, "mnt", "inputs"), exist_ok=True)
+    os.makedirs(os.path.join(local_dir, "mnt", "outputs"), exist_ok=True)
 
     def create_cmd_string() -> str:
         """
@@ -27,21 +37,31 @@ def run_container(
         return " ".join(pairs)
 
     cmd_string = create_cmd_string()
+    print("COMANDO PARA EJECUTAR ", cmd_string)
 
-    def create_volumes() -> dict:
+    def create_volumes(local_dir) -> dict:
         """
         Builds the volumes to mount in the container.
         By default, volumes are `/mnt/inputs/`, `/mnt/outputs/` and `/mnt/shared/`.
         """
         return {
-            f"{local_dir}/mnt/inputs": {"bind": "/mnt/inputs/", "mode": "rw"},
-            f"{local_dir}/mnt/outputs": {"bind": "/mnt/outputs/", "mode": "rw"},
-            f"{local_dir}/mnt/shared": {"bind": "/mnt/shared/", "mode": "rw"},
+            os.path.join(local_dir, "mnt", "inputs"): {
+                "bind": "/mnt/inputs/",
+                "mode": "rw",
+            },
+            os.path.join(local_dir, "mnt", "outputs"): {
+                "bind": "/mnt/outputs/",
+                "mode": "rw",
+            },
+            os.path.join(local_dir, "mnt", "shared"): {
+                "bind": "/mnt/shared/",
+                "mode": "rw",
+            },
         }
 
     container = client.containers.run(
         image=image,
-        volumes=create_volumes(),
+        volumes=create_volumes(local_dir),
         command=cmd_string,
         environment=environment,
         detach=True,

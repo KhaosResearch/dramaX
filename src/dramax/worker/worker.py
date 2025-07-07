@@ -44,6 +44,8 @@ log.info("Worker is ready")
 
 @dramatiq.actor(**settings.default_actor_opts.dict())
 def worker(task: dict, workflow_id: str):
+    print("PASSED TASK", task)
+    log = get_logger()
     message = CurrentMessage.get_current_message()
 
     task_id = task["id"]
@@ -54,17 +56,16 @@ def worker(task: dict, workflow_id: str):
     inputs = task.get("inputs", [])
     outputs = task.get("outputs", [])
 
-    log = get_logger()
     log = log.bind(
         message_id=message.message_id, task_id=task_id, workflow_id=workflow_id
     )
-
-    log.info("Running task", task=task)
 
     time.sleep(1)
 
     # Check if upstream tasks have failed before running this task.
     depends_on = task["depends_on"]
+    print("CURRENT TASK vID", task_id)
+    print("CURRENT TASK DEPENDS", depends_on)
     if depends_on:
         log.debug("Checking upstream tasks")
         tasks_in_db = TaskManager().find(parent=workflow_id)
@@ -90,9 +91,16 @@ def worker(task: dict, workflow_id: str):
     # This directory is mounted inside the container.
     task_dir = Path(settings.data_dir, task_author, workflow_id, task_id)
     task_dir.mkdir(parents=True, exist_ok=True)
+    s3_client = Minio(
+        endpoint=settings.minio_endpoint,
+        access_key=settings.minio_access_key,
+        secret_key=settings.minio_secret_key,
+        secure=settings.minio_use_ssl,
+    )
+
+    print("cliente creado", s3_client)
 
     log.debug("Created local directory", task_dir=task_dir)
-
     if not s3_client.bucket_exists(bucket_name=settings.minio_bucket):
         try:
             s3_client.make_bucket(bucket_name=settings.minio_bucket)
@@ -120,7 +128,6 @@ def worker(task: dict, workflow_id: str):
     log.debug(
         "Running container", image=container_image, parameters=container_parameters
     )
-
     try:
         set_running(task_id, workflow_id)
         result = run_container(
@@ -142,24 +149,23 @@ def worker(task: dict, workflow_id: str):
     with open(file_path, "w") as f:
         f.write(result or "There were no logs produced for this task.")
 
-    # Upload outputs to S3.
     object_name = str(Path(task_author, workflow_id, task_id, log_file_name))
     s3_client.fput_object(
         bucket_name=settings.minio_bucket,
         object_name=object_name,
         file_path=file_path,
     )
-
+    print("FILE PATH 1", file_path)
+    # Upload outputs to S3.
     for artifact in outputs:
         object_name = str(Path(task_author, workflow_id, task_id)) + artifact["path"]
         file_path = str(task_dir) + artifact["path"]
-
-        if not Path(file_path).exists():
-            log.warning("Output file not found in task folder", file_path=file_path)
-            continue
+        print("FILE PATH 2", file_path)
+        # if not Path(file_path).exists():
+        #     log.warning("Output file not found in task folder", file_path=file_path)
+        #     continue
 
         log.debug("Uploading output file", object_name=object_name, file_path=file_path)
-
         s3_client.fput_object(
             bucket_name=settings.minio_bucket,
             object_name=object_name,
@@ -240,6 +246,7 @@ def set_success(task_id: str, workflow_id: str, result_data: str):
 
 @dramatiq.actor(queue_name=settings.default_actor_opts.queue_name)
 def set_failure(message: MessageProxy, exception_data: str):
+    print("HA FALLADO TU TAREA", message["options"]["traceback"])
     actor_opts = message["options"]["options"]
     workflow_id = actor_opts["workflow_id"]
     task_result = Result(message=exception_data)
