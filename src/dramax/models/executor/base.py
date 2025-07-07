@@ -7,5 +7,4 @@ class Executor(BaseModel, ABC):
     type: str
 
     @abstractmethod
-    def execute(self):
-        ...
+    def execute(self) -> None: ...

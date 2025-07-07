@@ -1,6 +1,7 @@
 import platform
 import tempfile
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from pydantic import AnyUrl, BaseModel, BaseSettings
 from structlog import get_logger
@@ -44,6 +45,7 @@ class Settings(BaseSettings):
     minio_secret_key: str = "minio123"
     minio_use_ssl: bool = False
 
+    timezone: ZoneInfo = ZoneInfo("Europe/Madrid")
     # Actor options, as defined in dramatiq.actor.ActorOptions.
     # >>> export DEFAULT_ACTOR_OPTS='{"max_retries": 1}'
     default_actor_opts: ActorOpts = ActorOpts()
@@ -51,7 +53,7 @@ class Settings(BaseSettings):
     # Directory to store temporary files.
     # TODO: Use Path instead of str.
     data_dir: str = str(
-        Path("/tmp" if platform.system() == "Darwin" else tempfile.gettempdir())
+        Path("/tmp" if platform.system() == "Darwin" else tempfile.gettempdir()),
     )
 
     class Config:

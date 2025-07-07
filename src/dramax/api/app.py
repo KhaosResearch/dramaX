@@ -12,7 +12,7 @@ from structlog import get_logger
 from dramax import __version__
 from dramax.api.dependencies import get_api_key
 from dramax.api.routes.workflow import router
-from dramax.database import close_mongo, connect_to_mongo
+from dramax.models.databases.mongo import close_mongo, connect_to_mongo
 from dramax.settings import settings
 
 log = get_logger("dramax.api")

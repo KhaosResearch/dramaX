@@ -1,3 +1,4 @@
+from dramax.models.executor import DockerExecutor
 from dramax.models.task import Task
 from dramax.models.workflow import Workflow
 from dramax.worker.scheduler import Scheduler
@@ -5,14 +6,13 @@ from dramax.worker.scheduler import Scheduler
 tasks = [
     Task(
         id="t1",
-        type="docker",
         name="first_task",
-        image="busybox",
+        executor=DockerExecutor(type="docker", image="busybox"),
         parameters=[
             {
                 "name": "wget",
                 "value": "--output-document /mnt/shared/cities10.tsv https://raw.githubusercontent.com/solidsnack/tsv/master/cities10.tsv",
-            }
+            },
         ],
         outputs=[
             {
@@ -24,7 +24,7 @@ tasks = [
     Task(
         id="t2",
         name="second_task",
-        image="busybox",
+        executor=DockerExecutor(image="busybox"),
         parameters=[{"name": "cat", "value": "/mnt/shared/input.tsv"}],
         inputs=[
             {
@@ -42,9 +42,6 @@ workflow = Workflow(
     tasks=tasks,
     metadata={"author": "anonymous", "other-key": "other-value"},
 )
-
-# print("Workflow JSON:")
-# print(workflow.json(indent=2))
 
 scheduler = Scheduler()
 scheduler.run(workflow)

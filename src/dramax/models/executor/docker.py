@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 import docker
 
@@ -6,10 +6,10 @@ from .base import Executor
 
 
 class DockerExecutor(Executor):
+    type: Literal["docker"] = "docker"
     image: str
     label: str = "latest"
-    environment: dict[str, Any]
-    type: str = "docker"
+    environment: dict[str, Any] | None
 
     @staticmethod
     def execute(
@@ -34,8 +34,7 @@ class DockerExecutor(Executor):
             Builds the command to run in the container.
             """
             pairs = [
-                f"{parameter['name']} {parameter['value']}"
-                for parameter in parameters
+                f"{parameter['name']} {parameter['value']}" for parameter in parameters
             ]
             return " ".join(pairs)
 

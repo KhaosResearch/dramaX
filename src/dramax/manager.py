@@ -3,14 +3,14 @@ from typing import Any
 import dramatiq
 from pymongo.database import Database
 
-from dramax.database import get_mongo
+from dramax.models.databases.mongo import MongoService
 from dramax.models.task import Status, Task
 from dramax.models.workflow import TaskInDatabase, WorkflowInDatabase
 
 
 class BaseManager:
     def __init__(self, db: Database | None = None) -> None:
-        self.db = db or get_mongo()
+        self.db = db if db is not None else MongoService.get_database()
 
 
 class TaskManager(BaseManager):

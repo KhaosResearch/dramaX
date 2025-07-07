@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pymongo.database import Database
 from structlog import get_logger
 
-from dramax.database import get_mongo
+from dramax.models.databases.mongo import get_mongo
 from dramax.manager import TaskManager, WorkflowManager
 from dramax.models.workflow import ExecutionId, Workflow, WorkflowInDatabase
 from dramax.worker.scheduler import Scheduler

@@ -5,11 +5,8 @@ from datetime import datetime
 from pathlib import Path
 
 import dramatiq
-import minio
 from dramatiq import MessageProxy
-from dramatiq.brokers.rabbitmq import RabbitmqBroker
-from dramatiq.middleware import CurrentMessage, Retries
-from minio import Minio
+from dramatiq.middleware import CurrentMessage
 from structlog import get_logger
 
 from dramax.manager import TaskManager, WorkflowManager
@@ -17,29 +14,9 @@ from dramax.models.executor.docker import DockerExecutor
 from dramax.models.task import Result, Status, Task
 from dramax.models.workflow import WorkflowStatus
 from dramax.settings import settings
+from dramax.worker.setup_worker import _setup_worker
 
-log = get_logger("dramax.worker")
-
-log.info("Setting up RabbitMQ broker", url=settings.rabbit_dns)
-
-broker = RabbitmqBroker(url=settings.rabbit_dns)
-broker.add_middleware(CurrentMessage())
-
-retries = Retries(max_retries=0)
-broker.add_middleware(retries)
-
-dramatiq.set_broker(broker)
-
-log.info("Connected to queue", queue_name=settings.default_actor_opts.queue_name)
-
-s3_client = Minio(
-    settings.minio_endpoint,
-    access_key=settings.minio_access_key,
-    secret_key=settings.minio_secret_key,
-    secure=settings.minio_use_ssl,
-)
-
-log.info("Worker is ready")
+log, broker, minio_client = _setup_worker()
 
 
 @dramatiq.actor(**settings.default_actor_opts.dict())
@@ -82,13 +59,6 @@ def worker(task: dict, workflow_id: str) -> None:
 
         log.debug("Created local directory", task_dir=task_dir)
 
-        if not s3_client.bucket_exists(bucket_name=settings.minio_bucket):
-            try:
-                s3_client.make_bucket(bucket_name=settings.minio_bucket)
-            except minio.S3Error as e:
-                log.exception("Unexpected error when creating bucket", error=e)
-                raise
-
         for artifact in parsed_task.inputs:
             object_name = (
                 str(Path(parsed_task.metadata.author, workflow_id, artifact["source"]))
@@ -96,14 +66,7 @@ def worker(task: dict, workflow_id: str) -> None:
             )
             file_path = str(task_dir) + artifact["path"]
 
-            log.debug(
-                "Downloading input file",
-                object_name=object_name,
-                file_path=file_path,
-            )
-
-            s3_client.fget_object(
-                bucket_name=settings.minio_bucket,
+            minio_client.get_object(
                 object_name=object_name,
                 file_path=file_path,
             )
@@ -128,24 +91,31 @@ def worker(task: dict, workflow_id: str) -> None:
             raise
 
         # Create and upload log file.
-        now = datetime.now()
+        now = datetime.now(tz=settings.timezone)
         dt_string = now.strftime("%d-%m-%Y-%H:%M:%S")
         log_file_name = dt_string + "-log.txt"
         file_path = str(task_dir / log_file_name)
-        with open(file_path, "w") as f:
+        with Path.open(file_path, "w") as f:
             f.write(result or "There were no logs produced for this task.")
 
         # Upload outputs to S3.
-        object_name = str(Path(parsed_task.metadata.author, workflow_id, parsed_task.id, log_file_name))
-        s3_client.fput_object(
-            bucket_name=settings.minio_bucket,
+        object_name = str(
+            Path(
+                parsed_task.metadata.author,
+                workflow_id,
+                parsed_task.id,
+                log_file_name,
+            ),
+        )
+        minio_client.upload_object(
             object_name=object_name,
             file_path=file_path,
         )
 
         for artifact in parsed_task.outputs:
             object_name = (
-                str(Path(parsed_task.metadata.author, workflow_id, parsed_task.id)) + artifact["path"]
+                str(Path(parsed_task.metadata.author, workflow_id, parsed_task.id))
+                + artifact["path"]
             )
             file_path = str(task_dir) + artifact["path"]
 
@@ -159,8 +129,7 @@ def worker(task: dict, workflow_id: str) -> None:
                 file_path=file_path,
             )
 
-            s3_client.fput_object(
-                bucket_name=settings.minio_bucket,
+            minio_client.upload_object(
                 object_name=object_name,
                 file_path=file_path,
             )

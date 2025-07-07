@@ -1,12 +1,11 @@
 from collections import defaultdict
 from datetime import datetime
-from typing import Optional
 
 from pymongo.database import Database
 from structlog import get_logger
 
-from dramax.database import get_mongo
 from dramax.manager import TaskManager, WorkflowManager
+from dramax.models.databases.mongo import MongoService
 from dramax.models.task import Status, Task
 from dramax.models.workflow import Workflow, WorkflowInDatabase, WorkflowStatus
 from dramax.settings import settings
@@ -14,11 +13,12 @@ from dramax.worker import set_failure, worker
 
 
 class Scheduler:
-    def __init__(self, db: Optional[Database] = None):
-        self.db = db or get_mongo()
+    def __init__(self, db: Database | None = None) -> None:
+        self.db = db or MongoService.get_database()
+
         self.log = get_logger()
 
-    def run(self, workflow: Workflow):
+    def run(self, workflow: Workflow) -> None:
         """
         Execute workflow.
         """
@@ -28,7 +28,7 @@ class Scheduler:
         WorkflowManager(self.db).create_or_update_from_id(
             workflow.id,
             metadata=workflow.metadata.dict(),
-            created_at=datetime.now(),
+            created_at=datetime.now(tz=settings.timezone),
             status=WorkflowStatus.STATUS_PENDING,
         )
 
@@ -41,13 +41,13 @@ class Scheduler:
 
         sorted_tasks = self.sorted_tasks(workflow)
         if len(sorted_tasks) != len(workflow.tasks):
-            raise ValueError("Some tasks are missing")
+            msg = "Some tasks are missing"
+            raise ValueError(msg)
 
         for task_id in sorted_tasks:
-            print("ENQUEUING ", task_id)
             self.enqueue(task=inverted_index[task_id], workflow_id=workflow.id)
 
-    def enqueue(self, task: Task, workflow_id: str):
+    def enqueue(self, task: Task, workflow_id: str) -> None:
         task_id = task.id
         task_dict = task.dict()
         self.log.debug("Enqueuing task", task_id=task_id, workflow_id=workflow_id)
@@ -55,12 +55,11 @@ class Scheduler:
         TaskManager().create(
             task_id,
             parent=workflow_id,
-            created_at=datetime.now(),
+            created_at=datetime.now(tz=settings.timezone),
             status=Status.STATUS_PENDING,
             **task_dict,
         )
         self.log.info("Entering worker")
-        print("TASKS ENCOLADITAS ", task_dict)
         worker.send_with_options(
             args=(task_dict, workflow_id),
             on_failure=set_failure,
@@ -68,7 +67,6 @@ class Scheduler:
             or settings.default_actor_opts.queue_name,
             options={"task_id": task_id, "workflow_id": workflow_id},
         )
-        # broker.enqueue(message)
         self.log.info("Finished worker")
 
     def status(self, workflow_id: str) -> WorkflowInDatabase:
@@ -78,7 +76,7 @@ class Scheduler:
 
     @staticmethod
     def sorted_tasks(workflow: Workflow) -> list:
-        def iterative_topological_sort(graph, start):
+        def iterative_topological_sort(graph: defaultdict, start: list) -> list:
             seen = set()
             stack = []  # path variable is gone, stack and order are new
             order = []  # order will be in reverse order at first
@@ -105,6 +103,4 @@ class Scheduler:
                 for depends_on in task.depends_on:
                     graph[depends_on].append(task.id)
 
-        ordered_workflow_tasks = iterative_topological_sort(graph, sources)
-
-        return ordered_workflow_tasks
+        return iterative_topological_sort(graph, sources)

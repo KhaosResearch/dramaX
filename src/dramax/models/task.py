@@ -2,9 +2,9 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, Field, validator
 
-from dramax.models.executor.base import Executor
+from dramax.models.executor import APIExecutor, DockerExecutor
 
 
 class Status(str, Enum):
@@ -41,8 +41,7 @@ class File(BaseModel):
 class Task(BaseModel):
     id: str
     name: str
-    executor: Executor
-    parameters: list[Parameter] = []
+    executor: DockerExecutor | APIExecutor = Field(..., discriminator="type")
     inputs: list[File] = []
     outputs: list[File] = []
     options: Options = Options()
