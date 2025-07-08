@@ -6,7 +6,7 @@ from typing import List, Optional
 from pydantic import BaseModel, validator
 from pydantic.fields import Field
 
-from dramax.models.task import Task, TaskInDatabase
+from dramax.models.dramatiq.task import Task, TaskInDatabase
 
 
 class WorkflowStatus(str, Enum):

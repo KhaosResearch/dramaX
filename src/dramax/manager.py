@@ -1,16 +1,19 @@
 from typing import Any
 
 import dramatiq
+import structlog
+from dramatiq.brokers.rabbitmq import RabbitmqBroker
 from pymongo.database import Database
 
 from dramax.models.databases.mongo import MongoService
-from dramax.models.task import Status, Task
-from dramax.models.workflow import TaskInDatabase, WorkflowInDatabase
+from dramax.models.dramatiq.task import Status, Task
+from dramax.models.dramatiq.workflow import TaskInDatabase, WorkflowInDatabase
 
 
 class BaseManager:
     def __init__(self, db: Database | None = None) -> None:
         self.db = db if db is not None else MongoService.get_database()
+        self.log = structlog.get_logger("dramax.manager")
 
 
 class TaskManager(BaseManager):
@@ -56,6 +59,7 @@ class TaskManager(BaseManager):
         workflow_id: str,
         message: dramatiq.Message[Any],
         log,  # noqa: ANN001
+        broker: RabbitmqBroker,
     ) -> None:
         depends_on = task.depends_on
         if depends_on:
@@ -75,7 +79,7 @@ class TaskManager(BaseManager):
                             "Re-enqueueing task because upstream task is not done yet",
                             depends_on=task.id,
                         )
-                        dramatiq.get_broker().enqueue(message)
+                        broker.enqueue(message)
                         return
                     log.debug("Upstream task is done", upstream_task_id=task_in_db.id)
 

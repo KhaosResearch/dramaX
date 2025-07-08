@@ -10,13 +10,11 @@ class DockerExecutor(Executor):
     image: str
     label: str = "latest"
     environment: dict[str, Any] | None
+    binding_dir: str | None
+    command: list[dict[str, str]] | None
 
-    @staticmethod
     def execute(
-        image: str,
-        parameters: dict | None,
-        environment: dict | None,
-        local_dir: str,
+        self,
     ) -> str:
         """
         Runs a docker container with the given parameters.
@@ -34,7 +32,8 @@ class DockerExecutor(Executor):
             Builds the command to run in the container.
             """
             pairs = [
-                f"{parameter['name']} {parameter['value']}" for parameter in parameters
+                f"{parameter['name']} {parameter['value']}"
+                for parameter in self.command
             ]
             return " ".join(pairs)
 
@@ -46,16 +45,25 @@ class DockerExecutor(Executor):
             By default, volumes are `/mnt/inputs/`, `/mnt/outputs/` and `/mnt/shared/`.
             """
             return {
-                f"{local_dir}/mnt/inputs": {"bind": "/mnt/inputs/", "mode": "rw"},
-                f"{local_dir}/mnt/outputs": {"bind": "/mnt/outputs/", "mode": "rw"},
-                f"{local_dir}/mnt/shared": {"bind": "/mnt/shared/", "mode": "rw"},
+                f"{self.binding_dir}/mnt/inputs": {
+                    "bind": "/mnt/inputs/",
+                    "mode": "rw",
+                },
+                f"{self.binding_dir}/mnt/outputs": {
+                    "bind": "/mnt/outputs/",
+                    "mode": "rw",
+                },
+                f"{self.binding_dir}/mnt/shared": {
+                    "bind": "/mnt/shared/",
+                    "mode": "rw",
+                },
             }
 
         container = client.containers.run(
-            image=image,
+            image=self.image,
             volumes=create_volumes(),
             command=cmd_string,
-            environment=environment,
+            environment=self.environment,
             detach=True,
             tty=True,
         )

@@ -10,13 +10,16 @@ from dramatiq.middleware import CurrentMessage
 from structlog import get_logger
 
 from dramax.manager import TaskManager, WorkflowManager
+from dramax.models.dramatiq.task import Result, Status, Task
+from dramax.models.dramatiq.workflow import WorkflowStatus
 from dramax.models.executor.docker import DockerExecutor
-from dramax.models.task import Result, Status, Task
-from dramax.models.workflow import WorkflowStatus
 from dramax.settings import settings
-from dramax.worker.setup_worker import _setup_worker
+from dramax.worker.executor_service import run_task
+from dramax.worker.setup_worker import setup_worker
 
-log, broker, minio_client = _setup_worker()
+broker, minio_client = setup_worker()
+
+log = get_logger()
 
 
 @dramatiq.actor(**settings.default_actor_opts.dict())
@@ -25,8 +28,8 @@ def worker(task: dict, workflow_id: str) -> None:
 
     # Conversion to Task to work easier
     parsed_task = Task(**task)
-
     log = get_logger()
+
     log = log.bind(
         message_id=message.message_id,
         task_id=parsed_task.id,
@@ -43,48 +46,51 @@ def worker(task: dict, workflow_id: str) -> None:
         workflow_id,
         message,
         log,
+        broker,
     )  # * Moved to TaskManager Class
 
     if isinstance(parsed_task.executor, DockerExecutor):  # * Checked Docker Instance
         # Create local directory in which to store input and output files.
         # This directory is mounted inside the container.
         # TODO Check if it is necessary to move more things out
+        log.info("Docker task")
         task_dir = Path(
             settings.data_dir,
-            parsed_task.metadata.author,
+            parsed_task.metadata["author"],
             workflow_id,
             parsed_task.id,
         )  # ? Actualizar metadata en pydantic
         task_dir.mkdir(parents=True, exist_ok=True)
 
+        parsed_task.executor.binding_dir = task_dir
+
         log.debug("Created local directory", task_dir=task_dir)
 
         for artifact in parsed_task.inputs:
             object_name = (
-                str(Path(parsed_task.metadata.author, workflow_id, artifact["source"]))
-                + artifact["sourcePath"]
+                str(
+                    Path(
+                        parsed_task.metadata["author"],
+                        workflow_id,
+                        artifact.source,
+                    ),
+                )
+                + artifact.sourcePath
             )
-            file_path = str(task_dir) + artifact["path"]
+            file_path = str(task_dir) + artifact.path
 
             minio_client.get_object(
-                object_name=object_name,
+                object_path=object_name,
                 file_path=file_path,
             )
 
         log.debug(
-            "Running container",
-            image=parsed_task.executor.image,
-            parameters=parsed_task.parameters,
+            "Running container",  # TODO CHANGE THIS DEBUG FOR SOMETHING BETTER
         )
 
         try:
             set_running(parsed_task.id, workflow_id)
-            result = parsed_task.run(  # * NEW EXECUTE METHOD DONE
-                image=parsed_task.executor.image,
-                parameters=parsed_task.parameters,
-                environment=parsed_task.executor.environment,
-                local_dir=str(task_dir),
-            )
+            result = run_task(parsed_task)
             log.info("Result", result=result)
         except Exception as e:
             log.exception("Unexpected exception was raised by actor", error=e)
@@ -101,23 +107,23 @@ def worker(task: dict, workflow_id: str) -> None:
         # Upload outputs to S3.
         object_name = str(
             Path(
-                parsed_task.metadata.author,
+                parsed_task.metadata["author"],
                 workflow_id,
                 parsed_task.id,
                 log_file_name,
             ),
         )
         minio_client.upload_object(
-            object_name=object_name,
+            object_path=object_name,
             file_path=file_path,
         )
 
         for artifact in parsed_task.outputs:
             object_name = (
-                str(Path(parsed_task.metadata.author, workflow_id, parsed_task.id))
-                + artifact["path"]
+                str(Path(parsed_task.metadata["author"], workflow_id, parsed_task.id))
+                + artifact.path
             )
-            file_path = str(task_dir) + artifact["path"]
+            file_path = str(task_dir) + artifact.path
 
             if not Path(file_path).exists():
                 log.warning("Output file not found in task folder", file_path=file_path)
@@ -130,7 +136,7 @@ def worker(task: dict, workflow_id: str) -> None:
             )
 
             minio_client.upload_object(
-                object_name=object_name,
+                object_path=object_name,
                 file_path=file_path,
             )
 
@@ -182,27 +188,27 @@ def set_workflow_run_state(workflow_id: str):
 
     WorkflowManager().create_or_update_from_id(
         workflow_id=workflow_id,
-        updated_at=datetime.now(),
+        updated_at=datetime.now(tz=settings.timezone),
         status=workflow_status,
     )
 
 
-def set_running(task_id: str, workflow_id: str):
+def set_running(task_id: str, workflow_id: str) -> None:
     TaskManager().create_or_update_from_id(
         task_id,
         workflow_id,
-        updated_at=datetime.now(),
+        updated_at=datetime.now(tz=settings.timezone),
         status=Status.STATUS_RUNNING,
     )
     set_workflow_run_state(workflow_id=workflow_id)
 
 
-def set_success(task_id: str, workflow_id: str, result_data: str):
+def set_success(task_id: str, workflow_id: str, result_data: str) -> None:
     task_result = Result(log=result_data)
     TaskManager().create_or_update_from_id(
         task_id,
         workflow_id,
-        updated_at=datetime.now(),
+        updated_at=datetime.now(tz=settings.timezone),
         result=task_result.dict(),
         status=Status.STATUS_DONE,
     )
@@ -210,15 +216,15 @@ def set_success(task_id: str, workflow_id: str, result_data: str):
 
 
 @dramatiq.actor(queue_name=settings.default_actor_opts.queue_name)
-def set_failure(message: MessageProxy, exception_data: str):
-    print("HA FALLADO TU TAREA", message["options"]["traceback"])
+def set_failure(message: MessageProxy, exception_data: str) -> None:
+    log.error(message["options"]["traceback"])
     actor_opts = message["options"]["options"]
     workflow_id = actor_opts["workflow_id"]
     task_result = Result(message=exception_data)
     TaskManager().create_or_update_from_id(
         actor_opts["task_id"],
         workflow_id,
-        updated_at=datetime.now(),
+        updated_at=datetime.now(tz=settings.timezone),
         result=task_result.dict(),
         status=Status.STATUS_FAILED,
     )

@@ -48,10 +48,6 @@ class Task(BaseModel):
     metadata: dict = {}
     depends_on: list[str] = []
 
-    def run(self) -> None:
-        # Esta línea llamará a la implementación concreta según el tipo real del executor
-        self.executor.execute(self)
-
     @validator("name")
     def name_validations(cls, name: str):  # noqa: ANN201, N805
         if " " in name:

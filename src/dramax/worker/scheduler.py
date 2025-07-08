@@ -1,13 +1,13 @@
 from collections import defaultdict
 from datetime import datetime
 
+import structlog
 from pymongo.database import Database
-from structlog import get_logger
 
 from dramax.manager import TaskManager, WorkflowManager
 from dramax.models.databases.mongo import MongoService
-from dramax.models.task import Status, Task
-from dramax.models.workflow import Workflow, WorkflowInDatabase, WorkflowStatus
+from dramax.models.dramatiq.task import Status, Task
+from dramax.models.dramatiq.workflow import Workflow, WorkflowInDatabase, WorkflowStatus
 from dramax.settings import settings
 from dramax.worker import set_failure, worker
 
@@ -15,8 +15,8 @@ from dramax.worker import set_failure, worker
 class Scheduler:
     def __init__(self, db: Database | None = None) -> None:
         self.db = db or MongoService.get_database()
-
-        self.log = get_logger()
+        self.log = structlog.get_logger("dramax.scheduler")
+        self.log.info("Scheduler Initialized")
 
     def run(self, workflow: Workflow) -> None:
         """
@@ -25,12 +25,16 @@ class Scheduler:
         # Create workflow in database. We split this from the task creation
         # so that we can have a workflow in the database before any task is
         # created.
+
         WorkflowManager(self.db).create_or_update_from_id(
             workflow.id,
             metadata=workflow.metadata.dict(),
             created_at=datetime.now(tz=settings.timezone),
             status=WorkflowStatus.STATUS_PENDING,
         )
+        self.log = structlog.get_logger("dramax.scheduler")
+
+        self.log.info("PATATUDIN")
 
         for task in workflow.tasks:
             task.metadata.update(workflow.metadata.dict())

@@ -1,19 +1,21 @@
+from dramax.models.dramatiq.task import Task
+from dramax.models.dramatiq.workflow import Workflow
 from dramax.models.executor import DockerExecutor
-from dramax.models.task import Task
-from dramax.models.workflow import Workflow
 from dramax.worker.scheduler import Scheduler
+
+docker_cmd_t1 = [
+    {
+        "name": "wget",
+        "value": "--output-document /mnt/shared/cities10.tsv https://raw.githubusercontent.com/solidsnack/tsv/master/cities10.tsv",
+    },
+]
+
 
 tasks = [
     Task(
         id="t1",
         name="first_task",
-        executor=DockerExecutor(type="docker", image="busybox"),
-        parameters=[
-            {
-                "name": "wget",
-                "value": "--output-document /mnt/shared/cities10.tsv https://raw.githubusercontent.com/solidsnack/tsv/master/cities10.tsv",
-            },
-        ],
+        executor=DockerExecutor(type="docker", image="busybox", command=docker_cmd_t1),
         outputs=[
             {
                 "path": "/mnt/shared/cities10.tsv",
@@ -24,8 +26,10 @@ tasks = [
     Task(
         id="t2",
         name="second_task",
-        executor=DockerExecutor(image="busybox"),
-        parameters=[{"name": "cat", "value": "/mnt/shared/input.tsv"}],
+        executor=DockerExecutor(
+            image="busybox",
+            command=[{"name": "cat", "value": "/mnt/shared/input.tsv"}],
+        ),
         inputs=[
             {
                 "path": "/mnt/shared/input.tsv",

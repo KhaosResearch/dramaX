@@ -4,7 +4,7 @@ from structlog import get_logger
 
 from dramax.models.databases.mongo import get_mongo
 from dramax.manager import TaskManager, WorkflowManager
-from dramax.models.workflow import ExecutionId, Workflow, WorkflowInDatabase
+from dramax.models.dramatiq.workflow import ExecutionId, Workflow, WorkflowInDatabase
 from dramax.worker.scheduler import Scheduler
 
 log = get_logger("dramax.api.routes.workflow")
