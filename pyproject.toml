@@ -65,6 +65,7 @@ ignore = [
     "D",     # too much doc
     "FA100",
     "ANN003", # Annotation for **query
+    "INP001", # __init__.py for pkg
 ]
 
 [tool.hatch.version]

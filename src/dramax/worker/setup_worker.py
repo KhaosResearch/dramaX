@@ -5,7 +5,7 @@ from dramatiq.brokers.rabbitmq import RabbitmqBroker
 from dramatiq.middleware import CurrentMessage, Retries
 from structlog import get_logger
 
-from dramax.logger.configure_logger import configure_logger
+from dramax.configure_logger import configure_logger
 from dramax.models.databases.minio import MinioService
 from dramax.settings import settings
 

@@ -9,6 +9,7 @@ from dramatiq import MessageProxy
 from dramatiq.middleware import CurrentMessage
 from structlog import get_logger
 
+from dramax.exceptions import TaskDeferredException, TaskFailedException
 from dramax.manager import TaskManager, WorkflowManager
 from dramax.models.dramatiq.task import Result, Status, Task
 from dramax.models.dramatiq.workflow import WorkflowStatus
@@ -41,18 +42,19 @@ def worker(task: dict, workflow_id: str) -> None:
     time.sleep(1)
 
     # Check if upstream tasks have failed before running this task.
-    TaskManager().check_upstream(
-        parsed_task,
-        workflow_id,
-        message,
-        log,
-        broker,
-    )  # * Moved to TaskManager Class
+    try:
+        TaskManager().check_upstream(parsed_task, workflow_id, message, broker)
+    except TaskDeferredException:
+        log.info("Task deferred due to upstream dependency not finished")
+        return
+    except TaskFailedException as e:
+        log.exception("Task cannot proceed due to upstream failure", error=str(e))
+        raise
 
     if isinstance(parsed_task.executor, DockerExecutor):  # * Checked Docker Instance
         # Create local directory in which to store input and output files.
         # This directory is mounted inside the container.
-        # TODO Check if it is necessary to move more things out
+        # TODO Check if it is necessary to move more things out  # noqa: FIX002, TD002, TD003, TD004
         log.info("Docker task")
         task_dir = Path(
             settings.data_dir,
@@ -67,26 +69,9 @@ def worker(task: dict, workflow_id: str) -> None:
         log.debug("Created local directory", task_dir=task_dir)
 
         for artifact in parsed_task.inputs:
-            object_name = (
-                str(
-                    Path(
-                        parsed_task.metadata["author"],
-                        workflow_id,
-                        artifact.source,
-                    ),
-                )
-                + artifact.sourcePath
-            )
-            file_path = str(task_dir) + artifact.path
-
-            minio_client.get_object(
-                object_path=object_name,
-                file_path=file_path,
-            )
-
-        log.debug(
-            "Running container",  # TODO CHANGE THIS DEBUG FOR SOMETHING BETTER
-        )
+            object_name = f"{Path(parsed_task.metadata['author'], workflow_id, artifact.source)}{artifact.sourcePath}"
+            file_path = f"{task_dir}{artifact.path}"
+            minio_client.get_object(object_path=object_name, file_path=file_path)
 
         try:
             set_running(parsed_task.id, workflow_id)
@@ -149,7 +134,7 @@ def worker(task: dict, workflow_id: str) -> None:
             shutil.rmtree(task_dir)
 
 
-def set_workflow_run_state(workflow_id: str):
+def set_workflow_run_state(workflow_id: str) -> None:
     """
     Set workflow state based on task statuses.
     """
@@ -159,7 +144,8 @@ def set_workflow_run_state(workflow_id: str):
             "Workflow not found. This should not happen.",
             workflow_id=workflow_id,
         )
-        raise ValueError(f"Workflow `{workflow_id}` not found")
+        msg = f"Workflow `{workflow_id}` not found"
+        raise ValueError(msg)
 
     tasks = TaskManager().find(parent=workflow_id)
 

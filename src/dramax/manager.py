@@ -5,9 +5,13 @@ import structlog
 from dramatiq.brokers.rabbitmq import RabbitmqBroker
 from pymongo.database import Database
 
+from dramax.configure_logger import configure_logger
+from dramax.exceptions import TaskDeferredException, TaskFailedException
 from dramax.models.databases.mongo import MongoService
 from dramax.models.dramatiq.task import Status, Task
 from dramax.models.dramatiq.workflow import TaskInDatabase, WorkflowInDatabase
+
+configure_logger()
 
 
 class BaseManager:
@@ -58,30 +62,32 @@ class TaskManager(BaseManager):
         task: Task,
         workflow_id: str,
         message: dramatiq.Message[Any],
-        log,  # noqa: ANN001
         broker: RabbitmqBroker,
     ) -> None:
         depends_on = task.depends_on
+        self.log.info("Checking upstream tasks")
         if depends_on:
-            log.debug("Checking upstream tasks")
+            self.log.info("Checking upstream tasks")
             tasks_in_db = self.find(parent=workflow_id)
             for task_in_db in tasks_in_db:
                 if task_in_db.id in depends_on:
                     if task_in_db.status == Status.STATUS_FAILED:
-                        msg = "Upstream task failed"
-                        raise ValueError(msg)
+                        raise TaskFailedException(task.id, task_in_db.id)
                     if task_in_db.status in (
                         Status.STATUS_PENDING,
                         Status.STATUS_RUNNING,
                     ):
                         # We abruptly stop the current task execution and enqueue it again.
-                        log.debug(
-                            "Re-enqueueing task because upstream task is not done yet",
-                            depends_on=task.id,
+                        self.log.info(
+                            "Re-enqueueing task because upstream task is not done yet %s",
+                            depends_on,
                         )
                         broker.enqueue(message)
-                        return
-                    log.debug("Upstream task is done", upstream_task_id=task_in_db.id)
+                        raise TaskDeferredException(task_in_db.id, depends_on)
+                    self.log.info(
+                        "Upstream task is done",
+                        upstream_task_id=task_in_db.id,
+                    )
 
 
 class WorkflowManager(BaseManager):

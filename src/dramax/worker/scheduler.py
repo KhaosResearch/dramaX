@@ -32,9 +32,6 @@ class Scheduler:
             created_at=datetime.now(tz=settings.timezone),
             status=WorkflowStatus.STATUS_PENDING,
         )
-        self.log = structlog.get_logger("dramax.scheduler")
-
-        self.log.info("PATATUDIN")
 
         for task in workflow.tasks:
             task.metadata.update(workflow.metadata.dict())
