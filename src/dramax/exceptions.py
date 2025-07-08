@@ -20,3 +20,17 @@ class TaskFailedException(DramaxException):
         super().__init__(
             f"Task '{task_id}' failed due to upstream task '{failed_dependency}'.",
         )
+
+
+class DockerExecutionError(Exception):
+    """
+    Exception raised when a Docker container execution fails.
+
+    Attributes:
+        message (str): Human-readable error message.
+        status_code (int | None): Optional status code returned by the container.
+    """
+
+    def __init__(self, message: str, status_code: int | None = None) -> None:
+        self.status_code: int | None = status_code
+        super().__init__(message)

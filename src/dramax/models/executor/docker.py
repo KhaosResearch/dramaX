@@ -2,6 +2,8 @@ from typing import Any, Literal
 
 import docker
 
+from dramax.exceptions import DockerExecutionError
+
 from .base import Executor
 
 
@@ -78,6 +80,6 @@ class DockerExecutor(Executor):
 
         if result["StatusCode"] != 0:
             error_message = f"Container failed:\n{logs}"
-            raise Exception(error_message)
+            raise DockerExecutionError(error_message)
 
         return logs
