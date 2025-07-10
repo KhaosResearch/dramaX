@@ -14,7 +14,7 @@ from dramax import __version__
 from dramax.api.dependencies import get_api_key
 from dramax.api.routes.workflow import router
 from dramax.common.settings import settings
-from dramax.services.mongo import close_mongo, connect_to_mongo  # !CHANGE THISN IMPORTS
+from dramax.services.mongo import MongoService
 
 log = get_logger("dramax.api")
 
@@ -22,9 +22,9 @@ log = get_logger("dramax.api")
 @asynccontextmanager
 async def lifespan(_: FastAPI):  # noqa: ANN201
     """Context manager to initialize and close resources for the application."""
-    connect_to_mongo()
+    MongoService.connect()
     yield
-    close_mongo()
+    MongoService.disconnect()
 
 
 app = FastAPI(

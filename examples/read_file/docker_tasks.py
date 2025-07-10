@@ -1,7 +1,7 @@
 from dramax.models.dramatiq.task import Task
 from dramax.models.dramatiq.workflow import Workflow
 from dramax.models.executor import DockerExecutor
-from dramax.models.dramatiq.scheduler import Scheduler
+from dramax.worker.scheduler import Scheduler
 
 docker_cmd_t1 = [
     {
