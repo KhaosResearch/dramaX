@@ -3,7 +3,7 @@ from pymongo.database import Database
 from pymongo.errors import ServerSelectionTimeoutError
 from structlog import get_logger
 
-from dramax.settings import settings
+from dramax.common.settings import settings
 
 log = get_logger("dramax.database")
 
@@ -13,9 +13,7 @@ class MongoService:
 
     @classmethod
     def connect(cls) -> MongoClient:
-        """
-        Initialize and return the MongoDB client singleton.
-        """
+        """Initialize and return the MongoDB client singleton."""
         if cls._client is not None:
             return cls._client
 
@@ -36,17 +34,13 @@ class MongoService:
 
     @classmethod
     def get_database(cls, name: str = "dramax") -> Database:
-        """
-        Get the specified MongoDB database. Defaults to 'dramax'.
-        """
+        """Get the specified MongoDB database. Defaults to 'dramax'."""
         client = cls.connect()
         return client[name]
 
     @classmethod
     def disconnect(cls) -> None:
-        """
-        Cleanly close the MongoDB connection.
-        """
+        """Close the MongoDB connection."""
         if cls._client:
             log.debug("Closing MongoDB connection...")
             cls._client.close()

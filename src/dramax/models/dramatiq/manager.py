@@ -5,11 +5,11 @@ import structlog
 from dramatiq.brokers.rabbitmq import RabbitmqBroker
 from pymongo.database import Database
 
-from dramax.configure_logger import configure_logger
-from dramax.exceptions import TaskDeferredError, TaskFailedError
-from dramax.models.databases.mongo import MongoService
+from dramax.common.configure_logger import configure_logger
+from dramax.common.exceptions import TaskDeferredError, TaskFailedError
 from dramax.models.dramatiq.task import Status, Task
 from dramax.models.dramatiq.workflow import TaskInDatabase, WorkflowInDatabase
+from dramax.services.mongo import MongoService
 
 configure_logger()
 
@@ -22,16 +22,12 @@ class BaseManager:
 
 class TaskManager(BaseManager):
     def find(self, **query) -> list:
-        """
-        Get task(s) from database based on `query`.
-        """
+        """Get task(s) from database based on `query`."""
         tasks: dict = self.db.task.find(query)
         return [TaskInDatabase(**task) for task in tasks]
 
     def find_one(self, **query) -> TaskInDatabase | None:
-        """
-        Get task from database based on `query`.
-        """
+        """Get task from database based on `query`."""
         task_in_db: dict = self.db.task.find_one(query)
         if task_in_db:
             return TaskInDatabase(**task_in_db)
@@ -77,11 +73,12 @@ class TaskManager(BaseManager):
                         Status.STATUS_PENDING,
                         Status.STATUS_RUNNING,
                     ):
-                        # We abruptly stop the current task execution and enqueue it again.
-                        self.log.info(
-                            "Re-enqueueing task because upstream task is not done yet %s",
-                            depends_on,
+                        # Abruptly stop the current task execution and enqueue it again.
+                        msg = (
+                        "Re-enqueueing task because upstream task "
+                        "is not done yet %s"
                         )
+                        self.log.info(msg, depends_on)
                         broker.enqueue(message)
                         raise TaskDeferredError(task_in_db.id, depends_on)
                     self.log.info(

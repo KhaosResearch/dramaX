@@ -1,6 +1,6 @@
 from structlog import get_logger
 
-from dramax.exceptions import FileNotFoundForUploadError, UploadError
+from dramax.common.exceptions import FileNotFoundForUploadError, UploadError
 from dramax.models.dramatiq.task import Task
 
 

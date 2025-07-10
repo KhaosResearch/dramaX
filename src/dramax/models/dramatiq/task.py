@@ -6,14 +6,14 @@ from typing import Any
 
 from pydantic import BaseModel, Field, validator
 
-from dramax.exceptions import (
+from dramax.common.exceptions import (
     FileNotFoundForUploadError,
     InputDownloadError,
     UploadError,
 )
-from dramax.models.databases.minio import MinioService
+from dramax.common.settings import settings
 from dramax.models.executor import APIExecutor, DockerExecutor
-from dramax.settings import settings
+from dramax.services.minio import MinioService
 
 
 class Status(str, Enum):
@@ -61,7 +61,7 @@ class Task(BaseModel):
     workdir: str = None
 
     @validator("name")
-    def name_validations(cls, name: str):  # noqa: ANN201, N805
+    def name_validations(cls, name: str) -> str:
         if " " in name:
             msg = "name must not contain spaces"
             raise ValueError(msg)
@@ -72,9 +72,11 @@ class Task(BaseModel):
 
     def download_inputs(self) -> None:
         for artifact in self.inputs:
-            object_name = f"{Path(self.metadata['author'], self.workflow_id, artifact.source)}{artifact.sourcePath}"
+            object_name = (
+                f"{Path(self.metadata['author'], self.workflow_id, artifact.source)}"
+                f"{artifact.sourcePath}"
+            )
             file_path = f"{self.workdir}{artifact.path}"
-
             try:
                 MinioService.get_instance().get_object(
                     object_name=object_name,
@@ -85,7 +87,10 @@ class Task(BaseModel):
 
     def upload_outputs(self) -> None:
         for artifact in self.outputs:
-            object_name = f"{Path(self.metadata['author'], self.workflow_id, self.id)}{artifact.path}"
+            object_name = (
+                f"{Path(self.metadata['author'], self.workflow_id, self.id)}"
+                f"{artifact.path}"
+            )
             file_path = f"{self.workdir}{artifact.path}"
             if not Path(file_path).exists():
                 raise FileNotFoundForUploadError(file_path)
@@ -118,17 +123,13 @@ class Task(BaseModel):
             raise UploadError(object_name, file_path, e) from e
 
     def cleanup_workdir(self) -> None:
-        """
-        Delete the task's working directory if configured to do so.
-        """
+        """Delete the task's working directory if configured to do so."""
         if Path(self.workdir).exists() and self.options.on_finish_remove_local_dir:
             shutil.rmtree(Path(self.workdir))
 
 
 class TaskInDatabase(Task):
-    """
-    Represents a task in the database.
-    """
+    """Represents a task in the database."""
 
     parent: str  # workflow id
     created_at: datetime | None = None

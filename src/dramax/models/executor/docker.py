@@ -2,7 +2,7 @@ from typing import Any, Literal
 
 import docker
 
-from dramax.exceptions import DockerExecutionError
+from dramax.common.exceptions import DockerExecutionError
 
 from .base import Executor
 
@@ -18,8 +18,7 @@ class DockerExecutor(Executor):
     def execute(
         self,
     ) -> str:
-        """
-        Runs a docker container with the given parameters.
+        """Run a docker container with the given parameters.
 
         :param image: The docker image to run.
         :param parameters: The parameters to pass to the container.
@@ -30,9 +29,7 @@ class DockerExecutor(Executor):
         client = docker.from_env()
 
         def create_cmd_string() -> str:
-            """
-            Builds the command to run in the container.
-            """
+            """Build the command to run in the container."""
             pairs = [
                 f"{parameter['name']} {parameter['value']}"
                 for parameter in self.command
@@ -42,8 +39,8 @@ class DockerExecutor(Executor):
         cmd_string = create_cmd_string()
 
         def create_volumes() -> dict:
-            """
-            Builds the volumes to mount in the container.
+            """Build the volumes to mount in the container.
+
             By default, volumes are `/mnt/inputs/`, `/mnt/outputs/` and `/mnt/shared/`.
             """
             return {

@@ -1,4 +1,5 @@
-from .worker import set_failure, set_running, set_success, worker
+from .utils import set_failure, set_running, set_success
+from .worker import worker
 
 __all__ = [
     "set_failure",
@@ -7,6 +8,6 @@ __all__ = [
     "worker",
 ]
 
-from dramax.configure_logger import configure_logger
+from dramax.common.configure_logger import configure_logger
 
 configure_logger()

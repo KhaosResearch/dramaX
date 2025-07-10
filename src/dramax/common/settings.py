@@ -10,12 +10,12 @@ log = get_logger("dramax.settings")
 
 
 class MongoDns(AnyUrl):
-    allowed_schemes = {"mongodb"}
+    allowed_schemes = {"mongodb"}  # noqa: RUF012
     user_required = True
 
 
 class RabbitDns(AnyUrl):
-    allowed_schemes = {"amqp"}
+    allowed_schemes = {"amqp"}  # noqa: RUF012
     user_required = True
 
 
@@ -29,7 +29,7 @@ class ActorOpts(BaseModel):
 class Settings(BaseSettings):
     base_path: str = ""
 
-    api_host: str = "0.0.0.0"
+    api_host: str = "0.0.0.0"  # noqa: S104
     api_port: int = 8001
     api_debug: bool = False
     api_key: str = "dev"
@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     minio_endpoint: str = "localhost:9000"
     minio_bucket: str = "dramax"
     minio_access_key: str = "minio"
-    minio_secret_key: str = "minio123"
+    minio_secret_key: str = "minio123"  # noqa: S105
     minio_use_ssl: bool = False
 
     timezone: ZoneInfo = ZoneInfo("Europe/Madrid")
@@ -51,14 +51,13 @@ class Settings(BaseSettings):
     default_actor_opts: ActorOpts = ActorOpts()
 
     # Directory to store temporary files.
-    # TODO: Use Path instead of str.
     data_dir: str = str(
-        Path("/tmp" if platform.system() == "Darwin" else tempfile.gettempdir()),
+        Path("/tmp" if platform.system() == "Darwin" else tempfile.gettempdir()),  # noqa: S108
     )
 
     class Config:
         # Later files in the list will take priority over earlier files.
-        env_file = [
+        env_file = [  # noqa: RUF012
             ".env.local",
             ".env.prod",
             "/etc/dramax/.env.local",

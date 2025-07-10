@@ -1,7 +1,6 @@
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
 
 from pydantic import BaseModel, validator
 from pydantic.fields import Field
@@ -27,20 +26,22 @@ class WorkflowMetadata(BaseModel):
 class Workflow(BaseModel):
     id: str = Field(default_factory=lambda: "workflow-" + uuid.uuid4().hex[:8])
     label: str = ""
-    tasks: List[Task] = []
+    tasks: list[Task] = []
     metadata: WorkflowMetadata = WorkflowMetadata()
 
     @validator("tasks")
-    def task_ids_not_duplicated(cls, v):
-        ids = [v.id for v in v]
-        assert len(set(ids)) == len(ids), "Found duplicated IDs in workflow"
-        return v
+    def task_ids_not_duplicated(cls, tasks: list[Task]) -> list[Task]:
+        ids = [task.id for task in tasks]
+        if len(set(ids)) != len(ids):
+            msg = "Found duplicated IDs in workflow"
+            raise ValueError(msg)
+        return tasks
 
 
 class WorkflowInDatabase(BaseModel):
-    tasks: List[TaskInDatabase] = []
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    tasks: list[TaskInDatabase] = []
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
     status: WorkflowStatus = WorkflowStatus.STATUS_PENDING
     is_revoked: bool = False
 

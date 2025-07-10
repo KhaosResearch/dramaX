@@ -5,12 +5,13 @@ from pathlib import Path
 import structlog
 from pymongo.database import Database
 
-from dramax.manager import TaskManager, WorkflowManager
-from dramax.models.databases.mongo import MongoService
+from dramax.common.settings import settings
+from dramax.models.dramatiq.manager import TaskManager, WorkflowManager
 from dramax.models.dramatiq.task import Status, Task
-from dramax.models.dramatiq.workflow import Workflow, WorkflowInDatabase, WorkflowStatus
-from dramax.settings import settings
-from dramax.worker import set_failure, worker
+from dramax.models.dramatiq.workflow import Workflow, WorkflowStatus
+from dramax.services.mongo import MongoService
+from dramax.worker import worker
+from dramax.worker.utils import set_failure
 
 
 class Scheduler:
@@ -20,9 +21,7 @@ class Scheduler:
         self.log.info("Scheduler Initialized")
 
     def run(self, workflow: Workflow) -> None:
-        """
-        Execute workflow.
-        """
+        """Execute workflow."""
         # Create workflow in database. We split this from the task creation
         # so that we can have a workflow in the database before any task is
         # created.
@@ -36,12 +35,14 @@ class Scheduler:
 
         for task in workflow.tasks:
             task.metadata.update(workflow.metadata.dict())
-            task.workdir = str(Path(
-                settings.data_dir,
-                task.metadata["author"],
-                workflow.id,
-                task.id,
-            ))
+            task.workdir = str(
+                Path(
+                    settings.data_dir,
+                    task.metadata["author"],
+                    workflow.id,
+                    task.id,
+                ),
+            )
             task.workflow_id = workflow.id
 
         inverted_index = {}

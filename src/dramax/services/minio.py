@@ -3,7 +3,7 @@ from __future__ import annotations
 from minio import Minio
 from structlog import get_logger
 
-from dramax.settings import settings
+from dramax.common.settings import settings
 
 log = get_logger("dramax.minio")
 
@@ -47,9 +47,7 @@ class MinioService:
         log.debug("File uploaded to MinIO", path=object_path)
 
     def get_object(self, file_path: str, object_name: str) -> bytes:
-        """
-        Download an object from MinIO and return its content as bytes.
-        """
+        """Download an object from MinIO and return its content as bytes."""
         try:
             response = self.client.fget_object(
                 bucket_name=self.bucket,

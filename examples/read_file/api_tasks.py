@@ -1,7 +1,7 @@
 from dramax.models.dramatiq.task import Task
 from dramax.models.dramatiq.workflow import Workflow
 from dramax.models.executor import APIExecutor
-from dramax.worker.scheduler import Scheduler
+from dramax.models.dramatiq.scheduler import Scheduler
 
 tasks = [
     Task(
