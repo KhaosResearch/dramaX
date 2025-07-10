@@ -1,4 +1,3 @@
-import shutil
 import time
 from collections.abc import Callable
 from datetime import datetime
@@ -9,10 +8,14 @@ from dramatiq import MessageProxy
 from dramatiq.middleware import CurrentMessage
 from structlog import get_logger
 
-from dramax.exceptions import TaskDeferredException, TaskFailedException
+from dramax.exceptions import (
+    TaskDeferredError,
+    TaskFailedError,
+)
 from dramax.manager import TaskManager, WorkflowManager
 from dramax.models.dramatiq.task import Result, Status, Task
 from dramax.models.dramatiq.workflow import WorkflowStatus
+from dramax.models.executor.api import APIExecutor
 from dramax.models.executor.docker import DockerExecutor
 from dramax.settings import settings
 from dramax.worker.executor_service import run_task
@@ -44,34 +47,24 @@ def worker(task: dict, workflow_id: str) -> None:
     # Check if upstream tasks have failed before running this task.
     try:
         TaskManager().check_upstream(parsed_task, workflow_id, message, broker)
-    except TaskDeferredException:
+    except TaskDeferredError:
         log.info("Task deferred due to upstream dependency not finished")
         return
-    except TaskFailedException as e:
+    except TaskFailedError as e:
         log.exception("Task cannot proceed due to upstream failure", error=str(e))
         raise
 
     if isinstance(parsed_task.executor, DockerExecutor):  # * Checked Docker Instance
         # Create local directory in which to store input and output files.
         # This directory is mounted inside the container.
-        # TODO Check if it is necessary to move more things out  # noqa: FIX002, TD002, TD003, TD004
         log.info("Docker task")
-        task_dir = Path(
-            settings.data_dir,
-            parsed_task.metadata["author"],
-            workflow_id,
-            parsed_task.id,
-        )  # ? Actualizar metadata en pydantic
-        task_dir.mkdir(parents=True, exist_ok=True)
 
-        parsed_task.executor.binding_dir = task_dir
+        Path(parsed_task.workdir).mkdir(parents=True, exist_ok=True)
 
-        log.debug("Created local directory", task_dir=task_dir)
+        parsed_task.executor.binding_dir = parsed_task.workdir
+        parsed_task.executor.command = parsed_task.parameters
 
-        for artifact in parsed_task.inputs:
-            object_name = f"{Path(parsed_task.metadata['author'], workflow_id, artifact.source)}{artifact.sourcePath}"
-            file_path = f"{task_dir}{artifact.path}"
-            minio_client.get_object(object_path=object_name, file_path=file_path)
+        log.debug("Created local directory", task_dir=parsed_task.workdir)
 
         try:
             set_running(parsed_task.id, workflow_id)
@@ -81,57 +74,18 @@ def worker(task: dict, workflow_id: str) -> None:
             log.exception("Unexpected exception was raised by actor", error=e)
             raise
 
-        # Create and upload log file.
-        now = datetime.now(tz=settings.timezone)
-        dt_string = now.strftime("%d-%m-%Y-%H:%M:%S")
-        log_file_name = dt_string + "-log.txt"
-        file_path = str(task_dir / log_file_name)
-        with Path.open(file_path, "w") as f:
-            f.write(result or "There were no logs produced for this task.")
+    if isinstance(parsed_task.executor, APIExecutor):
+        pass
 
-        # Upload outputs to S3.
-        object_name = str(
-            Path(
-                parsed_task.metadata["author"],
-                workflow_id,
-                parsed_task.id,
-                log_file_name,
-            ),
-        )
-        minio_client.upload_object(
-            object_path=object_name,
-            file_path=file_path,
-        )
+    set_success(parsed_task.id, workflow_id, result)
 
-        for artifact in parsed_task.outputs:
-            object_name = (
-                str(Path(parsed_task.metadata["author"], workflow_id, parsed_task.id))
-                + artifact.path
-            )
-            file_path = str(task_dir) + artifact.path
+    log.info("Task finished successfully")
 
-            if not Path(file_path).exists():
-                log.warning("Output file not found in task folder", file_path=file_path)
-                continue
-
-            log.debug(
-                "Uploading output file",
-                object_name=object_name,
-                file_path=file_path,
-            )
-
-            minio_client.upload_object(
-                object_path=object_name,
-                file_path=file_path,
-            )
-
-        set_success(parsed_task.id, workflow_id, result)
-
-        log.info("Task finished successfully")
-
-        if task_dir.exists() and task["options"]["on_finish_remove_local_dir"]:
-            log.info("Deleting local directory", local_dir=task_dir)
-            shutil.rmtree(task_dir)
+    try:
+        parsed_task.cleanup_workdir()
+    except Exception as e:
+        log.exception("Failed to clean up working directory", error=e)
+        raise
 
 
 def set_workflow_run_state(workflow_id: str) -> None:

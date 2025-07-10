@@ -23,7 +23,7 @@ def setup_worker() -> tuple[Any, RabbitmqBroker, MinioService]:
     set_broker(broker)
     log.info("Connected to queue", queue_name=settings.default_actor_opts.queue_name)
 
-    minio_service = MinioService()
+    minio_service = MinioService.get_instance()
 
     log.info("Worker is ready")
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from minio import Minio
 from structlog import get_logger
 
@@ -7,7 +9,7 @@ log = get_logger("dramax.minio")
 
 
 class MinioService:
-    _instance: Minio | None = None
+    _instance: MinioService | None = None
 
     def __init__(self) -> None:
         self.client = Minio(
@@ -21,7 +23,7 @@ class MinioService:
         log.debug("MinIO client initialized")
 
     @classmethod
-    def get_instance(cls) -> Minio:
+    def get_instance(cls) -> MinioService:
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
@@ -44,20 +46,20 @@ class MinioService:
         )
         log.debug("File uploaded to MinIO", path=object_path)
 
-    def get_object(self, file_path: str, object_path: str) -> bytes:
+    def get_object(self, file_path: str, object_name: str) -> bytes:
         """
         Download an object from MinIO and return its content as bytes.
         """
         try:
             response = self.client.fget_object(
                 bucket_name=self.bucket,
-                object_name=object_path,
+                object_name=object_name,
                 file_path=file_path,
             )
-            msg = f"Object '{object_path}' downloaded from MinIO."
+            msg = f"Object '{object_name}' downloaded from MinIO."
             log.debug(msg)
         except Exception as e:
-            msg = f"Error getting object '{object_path}' from MinIO: {e}"
+            msg = f"Error getting object '{object_name}' from MinIO: {e}"
             log.exception(msg)
             raise
         return response

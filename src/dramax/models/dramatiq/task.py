@@ -1,10 +1,19 @@
+import shutil
 from datetime import datetime
 from enum import Enum
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field, validator
 
+from dramax.exceptions import (
+    FileNotFoundForUploadError,
+    InputDownloadError,
+    UploadError,
+)
+from dramax.models.databases.minio import MinioService
 from dramax.models.executor import APIExecutor, DockerExecutor
+from dramax.settings import settings
 
 
 class Status(str, Enum):
@@ -42,11 +51,14 @@ class Task(BaseModel):
     id: str
     name: str
     executor: DockerExecutor | APIExecutor = Field(..., discriminator="type")
+    parameters: list[dict[str, str]] | None
     inputs: list[File] = []
     outputs: list[File] = []
     options: Options = Options()
     metadata: dict = {}
     depends_on: list[str] = []
+    workflow_id: str = None  # ? ESTOS DOS CAMPOS TIENEN SENTIDO AQUI?
+    workdir: str = None
 
     @validator("name")
     def name_validations(cls, name: str):  # noqa: ANN201, N805
@@ -57,6 +69,60 @@ class Task(BaseModel):
             msg = "name must not contain dots"
             raise ValueError(msg)
         return name
+
+    def download_inputs(self) -> None:
+        for artifact in self.inputs:
+            object_name = f"{Path(self.metadata['author'], self.workflow_id, artifact.source)}{artifact.sourcePath}"
+            file_path = f"{self.workdir}{artifact.path}"
+
+            try:
+                MinioService.get_instance().get_object(
+                    object_name=object_name,
+                    file_path=file_path,
+                )  # Singleton service
+            except Exception as e:
+                raise InputDownloadError(object_name, file_path, e) from e
+
+    def upload_outputs(self) -> None:
+        for artifact in self.outputs:
+            object_name = f"{Path(self.metadata['author'], self.workflow_id, self.id)}{artifact.path}"
+            file_path = f"{self.workdir}{artifact.path}"
+            if not Path(file_path).exists():
+                raise FileNotFoundForUploadError(file_path)
+
+            try:
+                MinioService.get_instance().upload_object(
+                    object_path=object_name,
+                    file_path=file_path,
+                )  # Singleton service
+            except Exception as e:
+                raise UploadError(object_name, file_path, e) from e
+
+    def create_upload_logs(self, result: str) -> None:
+        log_file_name = (
+            datetime.now(tz=settings.timezone).strftime("%d-%m-%Y-%H:%M:%S")
+            + "-log.txt"
+        )
+        file_path = f"{Path(self.workdir, log_file_name)}"
+        with Path.open(file_path, "w") as f:
+            f.write(result)
+        object_name = (
+            f"{Path(self.metadata['author'], self.workflow_id, self.id)}{log_file_name}"
+        )
+        try:
+            MinioService.get_instance().upload_object(
+                object_path=object_name,
+                file_path=file_path,
+            )  # Singleton service
+        except Exception as e:
+            raise UploadError(object_name, file_path, e) from e
+
+    def cleanup_workdir(self) -> None:
+        """
+        Delete the task's working directory if configured to do so.
+        """
+        if Path(self.workdir).exists() and self.options.on_finish_remove_local_dir:
+            shutil.rmtree(Path(self.workdir))
 
 
 class TaskInDatabase(Task):

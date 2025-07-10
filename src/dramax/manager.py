@@ -6,7 +6,7 @@ from dramatiq.brokers.rabbitmq import RabbitmqBroker
 from pymongo.database import Database
 
 from dramax.configure_logger import configure_logger
-from dramax.exceptions import TaskDeferredException, TaskFailedException
+from dramax.exceptions import TaskDeferredError, TaskFailedError
 from dramax.models.databases.mongo import MongoService
 from dramax.models.dramatiq.task import Status, Task
 from dramax.models.dramatiq.workflow import TaskInDatabase, WorkflowInDatabase
@@ -72,7 +72,7 @@ class TaskManager(BaseManager):
             for task_in_db in tasks_in_db:
                 if task_in_db.id in depends_on:
                     if task_in_db.status == Status.STATUS_FAILED:
-                        raise TaskFailedException(task.id, task_in_db.id)
+                        raise TaskFailedError(task.id, task_in_db.id)
                     if task_in_db.status in (
                         Status.STATUS_PENDING,
                         Status.STATUS_RUNNING,
@@ -83,7 +83,7 @@ class TaskManager(BaseManager):
                             depends_on,
                         )
                         broker.enqueue(message)
-                        raise TaskDeferredException(task_in_db.id, depends_on)
+                        raise TaskDeferredError(task_in_db.id, depends_on)
                     self.log.info(
                         "Upstream task is done",
                         upstream_task_id=task_in_db.id,

@@ -1,5 +1,6 @@
 from collections import defaultdict
 from datetime import datetime
+from pathlib import Path
 
 import structlog
 from pymongo.database import Database
@@ -35,6 +36,13 @@ class Scheduler:
 
         for task in workflow.tasks:
             task.metadata.update(workflow.metadata.dict())
+            task.workdir = str(Path(
+                settings.data_dir,
+                task.metadata["author"],
+                workflow.id,
+                task.id,
+            ))
+            task.workflow_id = workflow.id
 
         inverted_index = {}
         for task in workflow.tasks:
@@ -49,12 +57,11 @@ class Scheduler:
             self.enqueue(task=inverted_index[task_id], workflow_id=workflow.id)
 
     def enqueue(self, task: Task, workflow_id: str) -> None:
-        task_id = task.id
         task_dict = task.dict()
-        self.log.debug("Enqueuing task", task_id=task_id, workflow_id=workflow_id)
+        self.log.debug("Enqueuing task", task_id=task.id, workflow_id=workflow_id)
 
         TaskManager().create(
-            task_id,
+            task.id,
             parent=workflow_id,
             created_at=datetime.now(tz=settings.timezone),
             status=Status.STATUS_PENDING,
@@ -66,14 +73,9 @@ class Scheduler:
             on_failure=set_failure,
             queue_name=task.options.queue_name
             or settings.default_actor_opts.queue_name,
-            options={"task_id": task_id, "workflow_id": workflow_id},
+            options={"task_id": task.id, "workflow_id": workflow_id},
         )
         self.log.info("Finished worker")
-
-    def status(self, workflow_id: str) -> WorkflowInDatabase:
-        workflow = WorkflowManager(self.db).find_one(id=workflow_id)
-        workflow.tasks = TaskManager(self.db).find(parent=workflow_id)
-        return workflow
 
     @staticmethod
     def sorted_tasks(workflow: Workflow) -> list:

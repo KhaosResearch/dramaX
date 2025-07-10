@@ -15,7 +15,8 @@ tasks = [
     Task(
         id="t1",
         name="first_task",
-        executor=DockerExecutor(type="docker", image="busybox", command=docker_cmd_t1),
+        executor=DockerExecutor(type="docker", image="busybox"),
+        parameters=docker_cmd_t1,
         outputs=[
             {
                 "path": "/mnt/shared/cities10.tsv",
@@ -28,8 +29,8 @@ tasks = [
         name="second_task",
         executor=DockerExecutor(
             image="busybox",
-            command=[{"name": "cat", "value": "/mnt/shared/input.tsv"}],
         ),
+        parameters=[{"name": "cat", "value": "/mnt/shared/input.tsv"}],
         inputs=[
             {
                 "path": "/mnt/shared/input.tsv",
