@@ -30,6 +30,23 @@ class TaskFailedError(TaskError):
         )
 
 
+class TaskExecutorError(TaskError):
+    """Raise when a task executor is invalid, unsupported, or fails to initialize.
+
+    Includes task and workflow context for debugging.
+    """
+
+    def __init__(self, task_id: str, workflow_id: str, executor_type: str) -> None:
+        self.task_id = task_id
+        self.workflow_id = workflow_id
+        self.executor_type = executor_type
+        message = (
+            f"Unsupported executor type '{executor_type}' for task '{task_id}' "
+            f"in workflow '{workflow_id}'."
+        )
+        super().__init__(message)
+
+
 class FileNotFoundForUploadError(FileError):
     """Raised when a file intended for upload to an external storage is not found on the local filesystem.
 

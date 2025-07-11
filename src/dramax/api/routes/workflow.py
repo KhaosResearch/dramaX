@@ -6,8 +6,8 @@ from structlog import get_logger
 
 from dramax.api.dependencies import fastapi_get_database
 from dramax.models.dramatiq.manager import TaskManager, WorkflowManager
-from dramax.worker.scheduler import Scheduler
 from dramax.models.dramatiq.workflow import ExecutionId, Workflow, WorkflowInDatabase
+from dramax.worker.scheduler import Scheduler
 
 log = get_logger("dramax.api.routes.workflow")
 

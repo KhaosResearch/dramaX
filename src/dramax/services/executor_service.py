@@ -1,17 +1,46 @@
+from pathlib import Path
+
 from structlog import get_logger
 
 from dramax.common.exceptions import FileNotFoundForUploadError, UploadError
 from dramax.models.dramatiq.task import Task
+from dramax.worker.utils import set_running
 
 
-def run_task(task: Task) -> str:
-    """
-    Executes a task using the task provided executor.
-    Parameters:
+def run_docker_task(task: Task) -> str:
+    # Create local directory in which to store input and output files.
+    # This directory is mounted inside the container.
+    log = get_logger()
+    log.info("Docker task")
+
+    Path(task.workdir).mkdir(parents=True, exist_ok=True)
+
+    task.executor.binding_dir = task.workdir
+    task.executor.command = task.parameters
+
+    log.debug("Created local directory", task_dir=task.workdir)
+
+    try:
+        set_running(task.id, task.workflow_id)
+        result = _common_run_task(task)
+        log.info("Result", result=result)
+    except Exception as e:
+        log.exception("Unexpected exception was raised by actor", error=e)
+        raise
+    return result
+
+
+def _common_run_task(task: Task) -> str:
+    """Execute a task using the task provided executor.
+
+    Parameters
+    ----------
     - task: A Task instance containing all the necessary data for execution.
 
-    Returns:
+    Returns
+    -------
     - A string containing the logs generated during the task execution.
+
     """
     log = get_logger()
 

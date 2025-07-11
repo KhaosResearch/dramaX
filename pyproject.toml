@@ -61,6 +61,7 @@ ignore = [
     "D104", # too much docs
     "D106", # too much docs
     "D107", # too much docs
+    "D417",
     "FA100",
     "ANN003", # Annotation for **query
     "INP001", # __init__.py for pkg
