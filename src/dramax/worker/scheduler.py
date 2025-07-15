@@ -10,8 +10,7 @@ from dramax.models.dramatiq.manager import TaskManager, WorkflowManager
 from dramax.models.dramatiq.task import Status, Task
 from dramax.models.dramatiq.workflow import Workflow, WorkflowStatus
 from dramax.services.mongo import MongoService
-from dramax.worker import worker
-from dramax.worker.utils import set_failure
+from dramax.worker import set_failure, worker
 
 
 class Scheduler:

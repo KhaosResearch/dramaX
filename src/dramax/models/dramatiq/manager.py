@@ -3,13 +3,12 @@ from typing import Any
 import dramatiq
 import structlog
 from dramatiq.brokers.rabbitmq import RabbitmqBroker
-from pymongo.database import Database
-
 from dramax.common.configure_logger import configure_logger
 from dramax.common.exceptions import TaskDeferredError, TaskFailedError
 from dramax.models.dramatiq.task import Status, Task
 from dramax.models.dramatiq.workflow import TaskInDatabase, WorkflowInDatabase
 from dramax.services.mongo import MongoService
+from pymongo.database import Database
 
 configure_logger()
 
@@ -75,8 +74,8 @@ class TaskManager(BaseManager):
                     ):
                         # Abruptly stop the current task execution and enqueue it again.
                         msg = (
-                        "Re-enqueueing task because upstream task "
-                        "is not done yet %s"
+                            "Re-enqueueing task because upstream task "
+                            "is not done yet %s"
                         )
                         self.log.info(msg, depends_on)
                         broker.enqueue(message)

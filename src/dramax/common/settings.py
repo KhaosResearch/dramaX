@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     minio_endpoint: str = "localhost:9000"
     minio_bucket: str = "dramax"
     minio_access_key: str = "minio"
-    minio_secret_key: str = "minio123"  # noqa: S105
+    minio_secret_key: str = "minio123"
     minio_use_ssl: bool = False
 
     timezone: ZoneInfo = ZoneInfo("Europe/Madrid")

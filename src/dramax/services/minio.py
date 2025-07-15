@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+from dramax.common.settings import settings
 from minio import Minio
 from structlog import get_logger
-
-from dramax.common.settings import settings
 
 log = get_logger("dramax.minio")
 

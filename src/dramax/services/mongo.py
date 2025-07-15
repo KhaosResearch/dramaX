@@ -1,9 +1,8 @@
+from dramax.common.settings import settings
 from pymongo import MongoClient
 from pymongo.database import Database
 from pymongo.errors import ServerSelectionTimeoutError
 from structlog import get_logger
-
-from dramax.common.settings import settings
 
 log = get_logger("dramax.database")
 

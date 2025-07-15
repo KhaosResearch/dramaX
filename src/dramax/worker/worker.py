@@ -1,4 +1,5 @@
 import time
+from datetime import datetime
 
 import dramatiq
 from dramatiq.middleware import CurrentMessage
@@ -11,11 +12,11 @@ from dramax.common.exceptions import (
 )
 from dramax.common.settings import settings
 from dramax.models.dramatiq.manager import TaskManager
-from dramax.models.dramatiq.task import Task
+from dramax.models.dramatiq.task import Result, Status, Task
 from dramax.models.executor.api import APIExecutor
 from dramax.models.executor.docker import DockerExecutor
-from dramax.services.executor_service import run_docker_task
-from dramax.worker.utils import set_success, setup_worker
+from dramax.services.executor_service import run_api_task, run_docker_task
+from dramax.worker.utils import set_success, set_workflow_run_state, setup_worker
 
 broker, minio_client = setup_worker()
 
@@ -56,7 +57,7 @@ def worker(task: dict, workflow_id: str) -> None:
                 result = run_docker_task(parsed_task)
             case APIExecutor():
                 # Manejar APIExecutor
-                pass
+                result = run_api_task(parsed_task)
             case _:
                 raise TaskExecutorError(  # noqa: TRY301
                     task_id=parsed_task.id,
@@ -76,3 +77,20 @@ def worker(task: dict, workflow_id: str) -> None:
     except Exception as e:
         log.exception("Failed to clean up working directory", error=e)
         raise
+
+
+@dramatiq.actor(queue_name=settings.default_actor_opts.queue_name)
+def set_failure(message: dramatiq.MessageProxy, exception_data: str) -> None:
+    log = get_logger("dramax.worker")
+    log.error(message["options"]["traceback"])
+    actor_opts = message["options"]["options"]
+    workflow_id = actor_opts["workflow_id"]
+    task_result = Result(message=exception_data)
+    TaskManager().create_or_update_from_id(
+        actor_opts["task_id"],
+        workflow_id,
+        updated_at=datetime.now(tz=settings.timezone),
+        result=task_result.dict(),
+        status=Status.STATUS_FAILED,
+    )
+    set_workflow_run_state(workflow_id=workflow_id)

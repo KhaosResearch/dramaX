@@ -2,8 +2,7 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
-import dramatiq
-from dramatiq import MessageProxy, set_broker
+from dramatiq import set_broker
 from dramatiq.brokers.rabbitmq import RabbitmqBroker
 from dramatiq.middleware import CurrentMessage, Retries
 from structlog import get_logger
@@ -98,22 +97,5 @@ def set_success(task_id: str, workflow_id: str, result_data: str) -> None:
         updated_at=datetime.now(tz=settings.timezone),
         result=task_result.dict(),
         status=Status.STATUS_DONE,
-    )
-    set_workflow_run_state(workflow_id=workflow_id)
-
-
-@dramatiq.actor(queue_name=settings.default_actor_opts.queue_name)
-def set_failure(message: MessageProxy, exception_data: str) -> None:
-    log = get_logger("dramax.worker")
-    log.error(message["options"]["traceback"])
-    actor_opts = message["options"]["options"]
-    workflow_id = actor_opts["workflow_id"]
-    task_result = Result(message=exception_data)
-    TaskManager().create_or_update_from_id(
-        actor_opts["task_id"],
-        workflow_id,
-        updated_at=datetime.now(tz=settings.timezone),
-        result=task_result.dict(),
-        status=Status.STATUS_FAILED,
     )
     set_workflow_run_state(workflow_id=workflow_id)

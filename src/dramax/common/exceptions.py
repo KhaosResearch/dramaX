@@ -50,7 +50,8 @@ class TaskExecutorError(TaskError):
 class FileNotFoundForUploadError(FileError):
     """Raised when a file intended for upload to an external storage is not found on the local filesystem.
 
-    Attributes:
+    Attributes
+    ----------
         file_path (str): The path of the file that was expected but not found.
 
     """  # noqa: E501
@@ -63,7 +64,8 @@ class FileNotFoundForUploadError(FileError):
 class DockerExecutionError(Exception):
     """Exception raised when a Docker container execution fails.
 
-    Attributes:
+    Attributes
+    ----------
         message (str): Human-readable error message.
         status_code (int | None): Optional status code returned by the container.
 
@@ -77,7 +79,8 @@ class DockerExecutionError(Exception):
 class InputDownloadError(MinioError):
     """Custom exception raised when an input file fails to download from the object storage (e.g., MinIO).
 
-    Attributes:
+    Attributes
+    ----------
         object_name (str): The name of the object that was attempted to be downloaded.
         file_path (str): The local path where the file was supposed to be saved.
         original_exception (Exception): The original exception raised by the storage client.
@@ -102,7 +105,8 @@ class InputDownloadError(MinioError):
 class UploadError(MinioError):
     """Raised when an upload operation to object storage (e.g., MinIO) fails.
 
-    Attributes:
+    Attributes
+    ----------
         object_name (str): Path in the object store where the file was supposed to be uploaded.
         file_path (str): Local file path that was being uploaded.
         original_exception (Exception): The original exception that triggered the failure.

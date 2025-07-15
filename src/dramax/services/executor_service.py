@@ -1,10 +1,9 @@
 from pathlib import Path
 
-from structlog import get_logger
-
 from dramax.common.exceptions import FileNotFoundForUploadError, UploadError
 from dramax.models.dramatiq.task import Task
 from dramax.worker.utils import set_running
+from structlog import get_logger
 
 
 def run_docker_task(task: Task) -> str:
@@ -19,6 +18,27 @@ def run_docker_task(task: Task) -> str:
     task.executor.command = task.parameters
 
     log.debug("Created local directory", task_dir=task.workdir)
+
+    try:
+        set_running(task.id, task.workflow_id)
+        result = _common_run_task(task)
+        log.info("Result", result=result)
+    except Exception as e:
+        log.exception("Unexpected exception was raised by actor", error=e)
+        raise
+    return result
+
+
+def run_api_task(task: Task) -> str:
+    log = get_logger()
+    log.info("API task")
+    relative_output_path = task.outputs[0].path.lstrip("/")
+    api_local_path = Path(task.workdir) / relative_output_path
+    api_local_path.parent.mkdir(parents=True, exist_ok=True)
+
+    task.executor.local_dir = api_local_path.parent  # Download minio file here
+
+    log.debug("Created local directory", task_dir=task.executor.local_dir)
 
     try:
         set_running(task.id, task.workflow_id)
@@ -61,6 +81,7 @@ def _common_run_task(task: Task) -> str:
     try:
         task.upload_outputs()
         task.create_upload_logs(result)
+        log.info("Successfully uploaded outputs and logs.")
     except FileNotFoundForUploadError as e:
         log.exception(
             "Output file not found in task folder",

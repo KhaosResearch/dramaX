@@ -8,18 +8,43 @@ tasks = [
         id="t1",
         name="first_task",
         executor=APIExecutor(
-            url="",
+            type="api",
+            url="http://localhost:8002/download_csv",
+            method="GET",
+            headers={"Content-Type": "text/csv"},
+            local_dir=None,
+            auth=["user-9753", "Hapy>+'|"],
+        ),
+        outputs=[
+            {
+                "path": "/api/shared/data.csv",
+            },
+        ],
+        on_fail_remove_local_dir=False,
+    ),
+    Task(
+        id="t2",
+        name="second_task",
+        executor=APIExecutor(
+            url="http://localhost:8002/calculate_spei",  # noqa:
             method="POST",
             headers={"Content-Type": "multipart/form-data"},
             body={},
+            auth=["user-9753", "Hapy>+'|"],
         ),
         inputs=[
             {
-                "path": "/mnt/shared/input.tsv",
+                "path": "/api/shared/data.csv",
                 "source": "t1",
-                "sourcePath": "/mnt/shared/cities10.tsv",
+                "sourcePath": "/api/shared/data.csv",
             },
         ],
+        outputs=[
+            {
+                "path": "/api/shared/data.csv",
+            },
+        ],
+        depends_on=["t1"],
     ),
 ]
 

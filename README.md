@@ -1,4 +1,4 @@
-# [dramaX](https://github.com/KhaosResearch/dramaX) 
+# [dramaX](https://github.com/KhaosResearch/dramaX)
 
 ![CI](https://github.com/KhaosResearch/dramaX/actions/workflows/ci.yml/badge.svg)
 ![Python >=3.7](https://img.shields.io/badge/python-%3E=3.7-blue.svg)
