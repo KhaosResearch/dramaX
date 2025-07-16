@@ -136,9 +136,7 @@ class Task(BaseModel):
             )  # need past task to retrieve file
             task_input_path.parent.mkdir(parents=True, exist_ok=True)
 
-            self.executor.input_dir = (
-                relative_input_path.parent
-            )  # Download minio file here
+            self.executor.input_dir = task_input_path  # Download minio file here
         except Exception as e:
             msg = (f"Failed to prepare input directories for {self.id}",)
             raise FolderPreparationError(msg, e) from e

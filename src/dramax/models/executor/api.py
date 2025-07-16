@@ -29,7 +29,7 @@ class APIExecutor(Executor):
         return result
 
     def get(self) -> str:
-        # ! De momento unica hace un get a un csv, estudiar mas casuisticas
+        # ! De momento unicamente hace un get a un csv, estudiar mas casuisticas
         log = get_logger("dramax.api_executor.get")
         log.bind(url=self.url, method="GET")
         try:
@@ -66,7 +66,7 @@ class APIExecutor(Executor):
     def post(self) -> str:
         log = get_logger("dramax.api_executor.post")
         log = log.bind(url=self.url, method="POST")
-        file_path = Path(self.output_dir)
+        file_path = Path(self.input_dir)
         try:
             if self.auth:
                 with Path.open(file_path, "rb") as f:
