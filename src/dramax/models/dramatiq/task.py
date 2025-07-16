@@ -4,6 +4,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from pydantic import BaseModel, Field, validator
+
 from dramax.common.exceptions import (
     FileNotFoundForUploadError,
     FolderPreparationError,
@@ -13,7 +15,6 @@ from dramax.common.exceptions import (
 from dramax.common.settings import settings
 from dramax.models.executor import APIExecutor, DockerExecutor
 from dramax.services.minio import MinioService
-from pydantic import BaseModel, Field, validator
 
 
 class Status(str, Enum):
