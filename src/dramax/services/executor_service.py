@@ -32,15 +32,14 @@ def run_docker_task(task: Task) -> str:
 def run_api_task(task: Task) -> str:
     log = get_logger()
     log.info("API task")
-    relative_output_path = task.outputs[0].path.lstrip("/")
-    api_local_path = Path(task.workdir) / relative_output_path
-    api_local_path.parent.mkdir(parents=True, exist_ok=True)
-
-    task.executor.local_dir = api_local_path.parent  # Download minio file here
-
-    log.debug("Created local directory", task_dir=task.executor.local_dir)
 
     try:
+        if len(task.inputs) > 0:
+            task.prepare_input_paths()
+            log.info("Created local input directory", input_dir=task.executor.input_dir)
+        task.prepare_output_paths()
+        log.info("Created local output directory", output_dir=task.executor.output_dir)
+
         set_running(task.id, task.workflow_id)
         result = _common_run_task(task)
         log.info("Result", result=result)
@@ -64,14 +63,16 @@ def _common_run_task(task: Task) -> str:
     """
     log = get_logger()
 
-    # First inputs are downloaded
-    try:
-        task.download_inputs()
-    except Exception as e:
-        log.exception("Input(s) download failed", error=e)
-        raise
+    # First inputs are downloaded if needed
+    if len(task.inputs) > 0:
+        try:
+            task.download_inputs()
 
-    # We execute the assigned task
+        except Exception as e:
+            log.exception("Input(s) download failed", error=e)
+            raise
+
+    # We prepare the folders and execute the assigned task
     try:
         result = task.executor.execute()
     except Exception as e:
@@ -81,7 +82,7 @@ def _common_run_task(task: Task) -> str:
     try:
         task.upload_outputs()
         task.create_upload_logs(result)
-        log.info("Successfully uploaded outputs and logs.")
+
     except FileNotFoundForUploadError as e:
         log.exception(
             "Output file not found in task folder",

@@ -60,6 +60,7 @@ ignore = [
     "D102", # too much docs
     "D103", # too much docs
     "D104", # too much docs
+    "D105", # too much docs
     "D106", # too much docs
     "D107", # too much docs
     "D417",

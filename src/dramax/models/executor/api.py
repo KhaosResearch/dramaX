@@ -12,10 +12,11 @@ class APIExecutor(Executor):
     url: str
     method: str = "POST"
     headers: dict[str, str]
+    auth: tuple | None
     body: dict[str, Any] | None
     timeout: int = 10
-    local_dir: str | None
-    auth: tuple | None
+    input_dir: str | None
+    output_dir: str | None
 
     def execute(
         self,
@@ -41,16 +42,13 @@ class APIExecutor(Executor):
                 )
                 response.raise_for_status()
 
-                if self.local_dir:
-                    output_path = Path(self.local_dir) / "data.csv"
-                    output_path.parent.mkdir(parents=True, exist_ok=True)
-
-                    with Path.open(output_path, "wb") as f:
+                if self.output_dir:
+                    with Path.open(self.output_dir, "wb") as f:
                         f.write(response.content)
 
                     message = (
                         f"[SUCCESS] File downloaded with status {response.status_code} "
-                        f"({response.reason}) and saved to {output_path}"
+                        f"({response.reason}) and saved to {self.output_dir}"
                     )
                     log.info(message)
                     return message
@@ -68,7 +66,7 @@ class APIExecutor(Executor):
     def post(self) -> str:
         log = get_logger("dramax.api_executor.post")
         log = log.bind(url=self.url, method="POST")
-        file_path = Path(self.local_dir) / "data.csv"
+        file_path = Path(self.output_dir)
         try:
             if self.auth:
                 with Path.open(file_path, "rb") as f:

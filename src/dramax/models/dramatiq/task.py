@@ -6,6 +6,7 @@ from typing import Any
 
 from dramax.common.exceptions import (
     FileNotFoundForUploadError,
+    FolderPreparationError,
     InputDownloadError,
     UploadError,
 )
@@ -125,6 +126,33 @@ class Task(BaseModel):
         """Delete the task's working directory if configured to do so."""
         if Path(self.workdir).exists() and self.options.on_finish_remove_local_dir:
             shutil.rmtree(Path(self.workdir))
+
+    def prepare_input_paths(self) -> None:
+        try:
+            relative_path = self.inputs[0].path.lstrip("/")
+            relative_input_path = Path(self.inputs[0].source) / relative_path
+            task_input_path = (
+                Path(self.workdir).parent / relative_input_path
+            )  # need past task to retrieve file
+            task_input_path.parent.mkdir(parents=True, exist_ok=True)
+
+            self.executor.input_dir = (
+                relative_input_path.parent
+            )  # Download minio file here
+        except Exception as e:
+            msg = (f"Failed to prepare input directories for {self.id}",)
+            raise FolderPreparationError(msg, e) from e
+
+    def prepare_output_paths(self) -> None:
+        try:
+            relative_output_path = self.outputs[0].path.lstrip("/")
+            task_output_path = Path(self.workdir) / relative_output_path
+            task_output_path.parent.mkdir(parents=True, exist_ok=True)
+
+            self.executor.output_dir = task_output_path
+        except Exception as e:
+            msg = (f"Failed to prepare output directories for {self.id}",)
+            raise FolderPreparationError(msg, e) from e
 
 
 class TaskInDatabase(Task):

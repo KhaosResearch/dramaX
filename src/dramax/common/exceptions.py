@@ -61,6 +61,33 @@ class FileNotFoundForUploadError(FileError):
         super().__init__(f"File not found for upload: {file_path}")
 
 
+class FolderPreparationError(TaskError):
+    """Exception raised when the preparation of input directories or paths fails.
+
+    This exception indicates that an error occurred while attempting to create
+    the necessary folders to download input files for a workflow.
+
+    Attributes
+    ----------
+        message (str): Descriptive error message.
+        original_exception (Exception, optional): The original exception that caused
+        this error, if any.
+
+    """
+
+    def __init__(
+        self, message: str, original_exception: Exception | None = None
+    ) -> None:
+        self.message = message
+        self.original_exception = original_exception
+        super().__init__(message)
+
+    def __str__(self) -> str:
+        if self.original_exception:
+            return f"{self.message} (Causa: {self.original_exception!r})"
+        return self.message
+
+
 class DockerExecutionError(Exception):
     """Exception raised when a Docker container execution fails.
 
