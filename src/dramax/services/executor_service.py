@@ -1,9 +1,10 @@
 from pathlib import Path
 
+from structlog import get_logger
+
 from dramax.common.exceptions import FileNotFoundForUploadError, UploadError
 from dramax.models.dramatiq.task import Task
 from dramax.worker.utils import set_running
-from structlog import get_logger
 
 
 def run_docker_task(task: Task) -> str:
