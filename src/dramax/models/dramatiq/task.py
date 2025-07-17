@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, validator
+from structlog import get_logger
 
 from dramax.common.exceptions import (
     FileNotFoundForUploadError,
@@ -64,6 +65,7 @@ class File(BaseModel):
 
     def get_full_path(self, base: str) -> str:
         """Construye el path absoluto local del archivo."""
+        path = self.path
         if self.path.startswith("/"):
             path = self.path.lstrip("/")
         return str(Path(base, self._ensure_relative(path)))
@@ -132,16 +134,21 @@ class Task(BaseModel):
                 raise UploadError(object_name, workdir, e) from e
 
     def create_upload_logs(self, result: str, workdir: str) -> None:
+        log = get_logger()
         log_file_name = (
             datetime.now(tz=settings.timezone).strftime("%d-%m-%Y-%H:%M:%S")
             + "-log.txt"
         )
 
-        log_file_path = Path(workdir) / log_file_name
-        log_file_path.parent.mkdir(parents=True, exist_ok=True)
-        # Escribir el contenido en el archivo log
-        with Path.open(log_file_path, "w") as f:
-            f.write(result)
+        try:
+            log_file_path = Path(workdir) / log_file_name
+            log_file_path.parent.mkdir(parents=True, exist_ok=True)
+            with log_file_path.open("w") as f:
+                f.write(result)
+        except PermissionError as e:
+            log.info(f"Error de permisos: {e}")
+            log.info(f"Intentando escribir en: {log_file_path}")
+            raise
 
         try:
             MinioService.get_instance().upload_object(

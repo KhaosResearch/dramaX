@@ -22,7 +22,7 @@ log = get_logger()
 
 
 @dramatiq.actor(**settings.default_actor_opts.dict())
-def worker(task: dict, workflow_id: str) -> None:
+def worker(task: dict, workflow_id: str, workdir: str) -> None:
     message = CurrentMessage.get_current_message()
 
     # Conversion to Task to work easier
@@ -34,16 +34,10 @@ def worker(task: dict, workflow_id: str) -> None:
         task_id=parsed_task.id,
         workflow_id=workflow_id,
     )
-    workdir = f"{
-        Path(
-            settings.data_dir,
-            parsed_task.metadata['author'],
-            workflow_id,
-            parsed_task.id,
-        )
-    }"
 
     log.info("Running task", task=parsed_task)
+
+    Path(workdir).mkdir(parents=True, exist_ok=True)
 
     time.sleep(1)
 

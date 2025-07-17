@@ -1,5 +1,6 @@
 from collections import defaultdict
 from datetime import datetime
+from pathlib import Path
 
 import structlog
 from pymongo.database import Database
@@ -57,9 +58,19 @@ class Scheduler:
             status=Status.STATUS_PENDING,
             **task_dict,
         )
+
+        workdir = str(
+            Path(
+                settings.data_dir,
+                task.metadata["author"],
+                workflow_id,
+                task.id,
+            ),
+        )
+
         self.log.info("Entering worker")
         worker.send_with_options(
-            args=(task_dict, workflow_id),
+            args=(task_dict, workflow_id, workdir),
             on_failure=set_failure,
             queue_name=task.options.queue_name
             or settings.default_actor_opts.queue_name,
