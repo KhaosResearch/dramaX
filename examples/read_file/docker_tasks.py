@@ -10,7 +10,7 @@ tasks = [
         parameters=[
             {
                 "name": "wget",
-                "value": "-P /mnt/shared/ https://raw.githubusercontent.com/solidsnack/tsv/master/cities10.tsv",
+                "value": "--output-document /mnt/shared/cities10.tsv https://raw.githubusercontent.com/solidsnack/tsv/master/cities10.tsv",
             }
         ],
         outputs=[

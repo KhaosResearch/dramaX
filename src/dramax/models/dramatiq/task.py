@@ -52,17 +52,32 @@ class File(BaseModel):
     source: str | None = None
     sourcePath: str | None = None  # noqa: N815 - Already defined in previous versions
     path: str
-    base: str | None = None
 
-    def get_full_path(self) -> str:
+    @staticmethod
+    def _ensure_relative(p: str) -> Path:
+        return Path(p).relative_to(Path(p).anchor) if Path(p).is_absolute() else Path(p)
+
+    @staticmethod
+    def _skip_first_dir(path: str) -> Path:
+        p = Path(path)
+        return p.relative_to("/tmp")  # noqa: S108
+
+    def get_full_path(self, base: str) -> str:
         """Construye el path absoluto local del archivo."""
-        return str(Path(self.base) / self.path)
+        if self.path.startswith("/"):
+            path = self.path.lstrip("/")
+        return str(Path(base, self._ensure_relative(path)))
 
-    def get_object_name(self) -> str:
-        """Construye el nombre del objeto."""
+    def get_object_name(self, base: str) -> str:
+        """Construye el nombre del objeto remoto para MinIO."""
+        base_path = self._skip_first_dir(base)
         if self.source and self.sourcePath:
-            return str(Path(self.base, self.source) / self.sourcePath)
-        return str(Path(self.base) / self.path)
+            return str(
+                base_path
+                / self._ensure_relative(self.source)
+                / self._ensure_relative(self.sourcePath)
+            )
+        return str(base_path / self._ensure_relative(self.path))
 
 
 class Task(BaseModel):
@@ -90,9 +105,8 @@ class Task(BaseModel):
 
     def download_inputs(self, workdir: str) -> None:
         for artifact in self.inputs:
-            artifact.base = str(workdir)
-            object_name = artifact.get_object_name()
-            file_path = artifact.get_full_path()
+            object_name = artifact.get_object_name(workdir)
+            file_path = artifact.get_full_path(workdir)
 
             try:
                 MinioService.get_instance().get_object(
@@ -104,11 +118,9 @@ class Task(BaseModel):
 
     def upload_outputs(self, workdir: str) -> None:
         for artifact in self.outputs:
-            artifact.base = workdir
-            object_name = artifact.get_object_name()
-            file_path = artifact.get_full_path()
-
-            if not Path(file_path).exists():
+            object_name = artifact.get_object_name(workdir)
+            file_path = artifact.get_full_path(workdir)
+            if not Path(file_path).parent.exists():
                 raise FileNotFoundForUploadError(file_path)
 
             try:
@@ -124,8 +136,9 @@ class Task(BaseModel):
             datetime.now(tz=settings.timezone).strftime("%d-%m-%Y-%H:%M:%S")
             + "-log.txt"
         )
-        log_file_path = Path(workdir) / log_file_name
 
+        log_file_path = Path(workdir) / log_file_name
+        log_file_path.parent.mkdir(parents=True, exist_ok=True)
         # Escribir el contenido en el archivo log
         with Path.open(log_file_path, "w") as f:
             f.write(result)

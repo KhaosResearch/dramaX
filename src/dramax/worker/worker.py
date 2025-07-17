@@ -34,8 +34,14 @@ def worker(task: dict, workflow_id: str) -> None:
         task_id=parsed_task.id,
         workflow_id=workflow_id,
     )
-
-    workdir = f"{Path(parsed_task.metadata['author'], workflow_id, parsed_task.id)}"
+    workdir = f"{
+        Path(
+            settings.data_dir,
+            parsed_task.metadata['author'],
+            workflow_id,
+            parsed_task.id,
+        )
+    }"
 
     log.info("Running task", task=parsed_task)
 

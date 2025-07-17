@@ -20,6 +20,8 @@ def execute_task(task: Task, workdir: str) -> str:
     """
     log = get_logger()
 
+    log.info(f"Working on the following dir: {workdir}")
+
     try:
         if len(task.inputs) > 0:
             task.download_inputs(workdir)
