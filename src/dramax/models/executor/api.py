@@ -1,93 +1,141 @@
 from pathlib import Path
-from typing import Any, Literal
 
 import requests
 from structlog import get_logger
 
-from .base import Executor
+from dramax.models.dramatiq.task import Task, UnpackedParams
 
 
-class APIExecutor(Executor):
-    type: Literal["api"] = "api"
-    url: str
-    method: str = "POST"
-    headers: dict[str, str]
-    auth: tuple | None
-    body: dict[str, Any] | None
-    timeout: int = 10
-    input_dir: str | None
-    output_dir: str | None
+def unpack_parameters(param: dict) -> UnpackedParams:
+    return UnpackedParams(
+        method=param.get("method"),
+        headers=param.get("headers"),
+        timeout=param.get("timeout"),
+        auth=param.get("auth"),
+        body={
+            k: v
+            for k, v in param.items()
+            if k not in {"method", "headers", "auth", "timeout"}
+        },
+    )
 
-    def execute(
-        self,
-    ) -> str:
-        method = self.method.upper()
-        if method == "GET":
-            result = self.get()
-        elif method == "POST":
-            result = self.post()
-        return result
 
-    def get(self) -> str:
-        # ! De momento unicamente hace un get a un csv, estudiar mas casuisticas
-        log = get_logger("dramax.api_executor.get")
-        log.bind(url=self.url, method="GET")
-        try:
-            if self.auth:  # self.auth debería ser una tupla (usuario, contraseña)
-                response = requests.get(
-                    self.url,
-                    headers=self.headers,
-                    timeout=self.timeout,
-                    auth=self.auth,
-                )
-                response.raise_for_status()
+def api_execute(task: Task, workdir: str) -> str:
+    unpacked_params = unpack_parameters(task.parameters)
+    method = unpacked_params.method.upper()
+    if method == "GET":
+        result = get(unpacked_params, workdir)
+    elif method == "POST":
+        result = post(unpacked_params, workdir)
+    return result
 
-                if self.output_dir:
-                    with Path.open(self.output_dir, "wb") as f:
-                        f.write(response.content)
 
-                    message = (
-                        f"[SUCCESS] File downloaded with status {response.status_code} "
-                        f"({response.reason}) and saved to {self.output_dir}"
-                    )
-                    log.info(message)
-                    return message
+def get(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
+    log = get_logger("dramax.api_executor.get")
+    log.bind(url=task.url, method="GET")
+    try:
+        if unpacked_params.auth:
+            response = requests.get(
+                task.url,
+                headers=unpacked_params.headers,
+                timeout=unpacked_params.timeout,
+                auth=unpacked_params.auth,
+            )
+            response.raise_for_status()
+
+            if not task.outputs:
                 message = (
                     f"[WARNING] File downloaded with status {response.status_code} "
-                    f"({response.reason}), but no local_dir specified. File not saved."
+                    f"({response.reason}), but no output dir specified. File not saved."
                 )
                 log.warning(message)
                 return message
-        except requests.RequestException as e:
-            message = f"[ERROR] Failed to download file from {self.url}: {e!s}"
-            log.exception(message)
+
+            for artifact in task.outputs:
+                artifact.base = workdir
+                file_path = artifact.get_full_path()
+                Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+
+                with Path.open(file_path, "wb") as f:
+                    f.write(response.content)
+
+                msg = (
+                    f"[SUCCESS] File downloaded with status {response.status_code} "
+                    f"({response.reason}) and saved to {file_path}"
+                )
+                log.info(msg)
+
+            return (
+                f"[SUCCESS] File downloaded and saved to {len(task.outputs)} locations."
+            )
+        message = "[ERROR] Authentication not provided."
+        log.error(message)
+        return message  # noqa: TRY300
+
+    except requests.RequestException as e:
+        message = f"[ERROR] Failed to download file from {task.url}: {e!s}"
+        log.exception(message)
         return message
 
-    def post(self) -> str:
-        log = get_logger("dramax.api_executor.post")
-        log = log.bind(url=self.url, method="POST")
-        file_path = Path(self.input_dir)
-        try:
-            if self.auth:
-                with Path.open(file_path, "rb") as f:
-                    files = {"data_file": f}
-                    response = requests.post(
-                        self.url,
-                        files=files,
-                        auth=self.auth,
-                        timeout=30,
+
+def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
+    log = get_logger("dramax.api_executor.post")
+    log = log.bind(url=task.url, method="POST")
+
+    try:
+        if not unpacked_params.auth:
+            message = f"[ERROR] Authentication not provided for {task.url}"
+            log.error(message)
+            return message
+
+        headers = unpacked_params.headers or {}
+
+        content_type = headers.get("Content-Type", "").lower()
+
+        if "multipart/form-data" in content_type:
+            for artifact in task.inputs:
+                artifact.base = workdir
+                file_path = Path(artifact.get_object_name())
+
+                if not file_path.exists():
+                    message = (
+                        f"[ERROR] File to upload in POST method not found: {file_path}"
                     )
-                    response.raise_for_status()
-                message = (
-                    f"[SUCCESS] File posted with status {response.status_code} "
-                    f"({response.reason})"
+                    log.error(message)
+                    return message
+
+                files = {"file": Path.open(file_path, "rb")}
+                data = dict(unpacked_params.body.items())
+
+                response = requests.post(
+                    task.url,
+                    files=files,
+                    data=data,
+                    headers=unpacked_params.headers,
+                    auth=unpacked_params.auth,
+                    timeout=unpacked_params.timeout,
                 )
-                log.info(message)
-            else:
-                message = f"[ERROR] Failed to authenticate to {self.url}"
-                log.exception(message)
-        except requests.RequestException as e:
-            message = f"[ERROR] Failed to post to {self.url}: {e!s}"
-            log.exception(message)
-            raise
+        else:
+            response = requests.post(
+                task.url,
+                headers=headers,
+                auth=unpacked_params.auth,
+                data=unpacked_params.body,
+                timeout=unpacked_params.timeout,
+            )
+        response.raise_for_status()
+
+        if files:
+            files["file"].close()
+
+        message = (
+            f"[SUCCESS] POST request completed with status {response.status_code} "
+            f"({response.reason})"
+        )
+        log.info(message)
+        return message  # noqa: TRY300
+
+    except requests.RequestException as e:
+        message = f"[ERROR] Failed to POST to {task.url}: {e!s}"
+        log.exception(message)
         return message

@@ -1,56 +1,12 @@
-from pathlib import Path
-
 from structlog import get_logger
 
 from dramax.common.exceptions import FileNotFoundForUploadError, UploadError
 from dramax.models.dramatiq.task import Task
-from dramax.worker.utils import set_running
+from dramax.models.executor.api import api_execute
+from dramax.models.executor.docker import docker_execute
 
 
-def run_docker_task(task: Task) -> str:
-    # Create local directory in which to store input and output files.
-    # This directory is mounted inside the container.
-    log = get_logger()
-    log.info("Docker task")
-
-    Path(task.workdir).mkdir(parents=True, exist_ok=True)
-
-    task.executor.binding_dir = task.workdir
-    task.executor.command = task.parameters
-
-    log.debug("Created local directory", task_dir=task.workdir)
-
-    try:
-        set_running(task.id, task.workflow_id)
-        result = _common_run_task(task)
-        log.info("Result", result=result)
-    except Exception as e:
-        log.exception("Unexpected exception was raised by actor", error=e)
-        raise
-    return result
-
-
-def run_api_task(task: Task) -> str:
-    log = get_logger()
-    log.info("API task")
-
-    try:
-        if len(task.inputs) > 0:
-            task.prepare_input_paths()
-            log.info("Created local input directory", input_dir=task.executor.input_dir)
-        task.prepare_output_paths()
-        log.info("Created local output directory", output_dir=task.executor.output_dir)
-
-        set_running(task.id, task.workflow_id)
-        result = _common_run_task(task)
-        log.info("Result", result=result)
-    except Exception as e:
-        log.exception("Unexpected exception was raised by actor", error=e)
-        raise
-    return result
-
-
-def _common_run_task(task: Task) -> str:
+def execute_task(task: Task, workdir: str) -> str:
     """Execute a task using the task provided executor.
 
     Parameters
@@ -64,25 +20,27 @@ def _common_run_task(task: Task) -> str:
     """
     log = get_logger()
 
-    # First inputs are downloaded if needed
-    if len(task.inputs) > 0:
-        try:
-            task.download_inputs()
-
-        except Exception as e:
-            log.exception("Input(s) download failed", error=e)
-            raise
-
-    # We prepare the folders and execute the assigned task
     try:
-        result = task.executor.execute()
+        if len(task.inputs) > 0:
+            task.download_inputs(workdir)
+
+    except Exception as e:  #! Falta la excepcion de las carpetas
+        log.exception("Input(s) download failed", error=e)
+        raise
+
+    try:
+        if hasattr(task, "image") and task.image:
+            log.info("Docker task")
+            result = docker_execute(task, workdir)
+        elif hasattr(task, "url") and task.url:
+            log.info("API task")
+            result = api_execute(task, workdir)
     except Exception as e:
         log.exception("Unexpected exception was raised by executor", error=e)
         raise
-    # Outputs and logs are uploaded
     try:
-        task.upload_outputs()
-        task.create_upload_logs(result)
+        task.upload_outputs(workdir)
+        task.create_upload_logs(result, workdir)
 
     except FileNotFoundForUploadError as e:
         log.exception(

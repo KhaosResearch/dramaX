@@ -1,82 +1,59 @@
-from typing import Any, Literal
-
 import docker
 
-from dramax.common.exceptions import DockerExecutionError
-
-from .base import Executor
+from dramax.models.dramatiq.task import Task
 
 
-class DockerExecutor(Executor):
-    type: Literal["docker"] = "docker"
-    image: str
-    label: str = "latest"
-    environment: dict[str, Any] | None
-    binding_dir: str | None
-    command: list[dict[str, str]] | None
+def docker_execute(task: Task, workdir: str) -> str:
+    """Runs a docker container with the given parameters.
 
-    def execute(
-        self,
-    ) -> str:
-        """Run a docker container with the given parameters.
+    :param image: The docker image to run.
+    :param parameters: The parameters to pass to the container.
+    :param environment: The environment variables to pass to the container.
+    :param local_dir: The local directory to mount in the container.
+    :return: The logs of the container.
+    """
+    client = docker.from_env()
 
-        :param image: The docker image to run.
-        :param parameters: The parameters to pass to the container.
-        :param environment: The environment variables to pass to the container.
-        :param local_dir: The local directory to mount in the container.
-        :return: The logs of the container.
+    def create_cmd_string() -> str:
+        """Builds the command to run in the container."""
+        pairs = [
+            f"{parameter['name']} {parameter['value']}" for parameter in task.parameters
+        ]
+
+        return " ".join(pairs)
+
+    cmd_string = create_cmd_string()
+
+    def create_volumes() -> dict:
+        """Builds the volumes to mount in the container.
+
+        By default, volumes are `/mnt/inputs/`, `/mnt/outputs/` and `/mnt/shared/`.
         """
-        client = docker.from_env()
+        return {
+            f"{workdir}/mnt/inputs": {"bind": "/mnt/inputs/", "mode": "rw"},
+            f"{workdir}/mnt/outputs": {"bind": "/mnt/outputs/", "mode": "rw"},
+            f"{workdir}/mnt/shared": {"bind": "/mnt/shared/", "mode": "rw"},
+        }
 
-        def create_cmd_string() -> str:
-            """Build the command to run in the container."""
-            pairs = [
-                f"{parameter['name']} {parameter['value']}"
-                for parameter in self.command
-            ]
-            return " ".join(pairs)
+    container = client.containers.run(
+        image=task.image,
+        volumes=create_volumes(),
+        command=cmd_string,
+        environment=task.environment,
+        detach=True,
+        tty=True,
+    )
+    result = container.wait()
+    logs = container.logs().decode("utf-8")
 
-        cmd_string = create_cmd_string()
+    # Prepend the command string to the logs.
+    logs = f"{cmd_string}\n{logs}"
 
-        def create_volumes() -> dict:
-            """Build the volumes to mount in the container.
+    container.stop()
+    container.remove(v=True)
 
-            By default, volumes are `/mnt/inputs/`, `/mnt/outputs/` and `/mnt/shared/`.
-            """
-            return {
-                f"{self.binding_dir}/mnt/inputs": {
-                    "bind": "/mnt/inputs/",
-                    "mode": "rw",
-                },
-                f"{self.binding_dir}/mnt/outputs": {
-                    "bind": "/mnt/outputs/",
-                    "mode": "rw",
-                },
-                f"{self.binding_dir}/mnt/shared": {
-                    "bind": "/mnt/shared/",
-                    "mode": "rw",
-                },
-            }
+    if result["StatusCode"] != 0:
+        error_message = f"Container failed:\n{logs}"
+        raise Exception(error_message)
 
-        container = client.containers.run(
-            image=self.image,
-            volumes=create_volumes(),
-            command=cmd_string,
-            environment=self.environment,
-            detach=True,
-            tty=True,
-        )
-        result = container.wait()
-        logs = container.logs().decode("utf-8")
-
-        # Prepend the command string to the logs.
-        logs = f"{cmd_string}\n{logs}"
-
-        container.stop()
-        container.remove(v=True)
-
-        if result["StatusCode"] != 0:
-            error_message = f"Container failed:\n{logs}"
-            raise DockerExecutionError(error_message)
-
-        return logs
+    return logs

@@ -7,6 +7,23 @@ tasks = [
     Task(
         id="t1",
         name="first_task",
+        url="busybox",
+        parameters=[
+            {
+                "method": "GET",
+                "headers": {"Content-Type": "text/csv"},
+                "auth": ["user-9753", "Hapy>+'|"],
+            }
+        ],
+        outputs=[
+            {
+                "path": "/mnt/shared/cities10.tsv",
+            }
+        ],
+    ),
+    Task(
+        id="t1",
+        name="first_task",
         executor=APIExecutor(
             type="api",
             url="http://localhost:8002/download_csv",

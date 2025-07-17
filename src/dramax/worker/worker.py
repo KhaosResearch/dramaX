@@ -1,5 +1,6 @@
 import time
 from datetime import datetime
+from pathlib import Path
 
 import dramatiq
 from dramatiq.middleware import CurrentMessage
@@ -7,15 +8,12 @@ from structlog import get_logger
 
 from dramax.common.exceptions import (
     TaskDeferredError,
-    TaskExecutorError,
     TaskFailedError,
 )
 from dramax.common.settings import settings
 from dramax.models.dramatiq.manager import TaskManager
 from dramax.models.dramatiq.task import Result, Status, Task
-from dramax.models.executor.api import APIExecutor
-from dramax.models.executor.docker import DockerExecutor
-from dramax.services.executor_service import run_api_task, run_docker_task
+from dramax.services.executor_service import execute_task
 from dramax.worker.utils import set_success, set_workflow_run_state, setup_worker
 
 broker, minio_client = setup_worker()
@@ -37,6 +35,8 @@ def worker(task: dict, workflow_id: str) -> None:
         workflow_id=workflow_id,
     )
 
+    workdir = f"{Path(parsed_task.metadata['author'], workflow_id, parsed_task.id)}"
+
     log.info("Running task", task=parsed_task)
 
     time.sleep(1)
@@ -52,19 +52,10 @@ def worker(task: dict, workflow_id: str) -> None:
         raise
 
     try:
-        match parsed_task.executor:
-            case DockerExecutor():
-                result = run_docker_task(parsed_task)
-            case APIExecutor():
-                # Manejar APIExecutor
-                result = run_api_task(parsed_task)
-            case _:
-                raise TaskExecutorError(  # noqa: TRY301
-                    task_id=parsed_task.id,
-                    workflow_id=parsed_task.workflow_id,
-                    executor_type=type(parsed_task.executor).__name__,
-                )
-    except Exception as e:
+        log.info("Executing task")
+        result = execute_task(parsed_task, workdir)
+
+    except Exception as e:  # TODO : mejorar manejo de excepciones
         log.exception("Task not executed properly", error=str(e))
         raise
 
@@ -73,7 +64,7 @@ def worker(task: dict, workflow_id: str) -> None:
     log.info("Task finished successfully")
 
     try:
-        parsed_task.cleanup_workdir()
+        parsed_task.cleanup_workdir(workdir)
     except Exception as e:
         log.exception("Failed to clean up working directory", error=e)
         raise

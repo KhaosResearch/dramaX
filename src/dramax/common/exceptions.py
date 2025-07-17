@@ -30,7 +30,7 @@ class TaskFailedError(TaskError):
         )
 
 
-class TaskExecutorError(TaskError):
+class TaskExecutionError(TaskError):
     """Raise when a task executor is invalid, unsupported, or fails to initialize.
 
     Includes task and workflow context for debugging.

@@ -1,6 +1,5 @@
 from collections import defaultdict
 from datetime import datetime
-from pathlib import Path
 
 import structlog
 from pymongo.database import Database
@@ -34,15 +33,6 @@ class Scheduler:
 
         for task in workflow.tasks:
             task.metadata.update(workflow.metadata.dict())
-            task.workdir = str(
-                Path(
-                    settings.data_dir,
-                    task.metadata["author"],
-                    workflow.id,
-                    task.id,
-                ),
-            )
-            task.workflow_id = workflow.id
 
         inverted_index = {}
         for task in workflow.tasks:

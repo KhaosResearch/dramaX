@@ -1,5 +1,3 @@
-from .api import APIExecutor
-from .base import Executor
-from .docker import DockerExecutor
+from dramax.common.configure_logger import configure_logger
 
-__all__ = ["APIExecutor", "DockerExecutor", "Executor"]
+configure_logger()
