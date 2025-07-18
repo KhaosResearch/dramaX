@@ -10,7 +10,7 @@ def unpack_parameters(param: dict) -> UnpackedParams:
     return UnpackedParams(
         method=param.get("method"),
         headers=param.get("headers"),
-        timeout=param.get("timeout"),
+        timeout=param.get("timeout", 10),
         auth=param.get("auth"),
         body={
             k: v
@@ -21,12 +21,17 @@ def unpack_parameters(param: dict) -> UnpackedParams:
 
 
 def api_execute(task: Task, workdir: str) -> str:
-    unpacked_params = unpack_parameters(task.parameters)
+    log = get_logger()
+    params = task.parameters
+    unpacked_params = unpack_parameters(params[0])
+    log.info("Unpacked params", unpacked_params=unpacked_params)
     method = unpacked_params.method.upper()
+
     if method == "GET":
-        result = get(unpacked_params, workdir)
+        result = get(task, unpacked_params, workdir)
     elif method == "POST":
-        result = post(unpacked_params, workdir)
+        result = post(task, unpacked_params, workdir)
+
     return result
 
 
@@ -52,8 +57,7 @@ def get(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
                 return message
 
             for artifact in task.outputs:
-                artifact.base = workdir
-                file_path = artifact.get_full_path()
+                file_path = artifact.get_full_path(workdir)
                 Path(file_path).parent.mkdir(parents=True, exist_ok=True)
 
                 with Path.open(file_path, "wb") as f:
@@ -75,12 +79,13 @@ def get(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
     except requests.RequestException as e:
         message = f"[ERROR] Failed to download file from {task.url}: {e!s}"
         log.exception(message)
-        return message
+        raise
 
 
 def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
     log = get_logger("dramax.api_executor.post")
     log = log.bind(url=task.url, method="POST")
+    headers = unpacked_params.headers
 
     try:
         if not unpacked_params.auth:
@@ -88,14 +93,13 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
             log.error(message)
             return message
 
-        headers = unpacked_params.headers or {}
+        headers = unpacked_params.headers
 
-        content_type = headers.get("Content-Type", "").lower()
+        content_type = headers.get("Content-Type").lower()
 
         if "multipart/form-data" in content_type:
             for artifact in task.inputs:
-                artifact.base = workdir
-                file_path = Path(artifact.get_object_name())
+                file_path = Path(artifact.get_full_path(workdir))
 
                 if not file_path.exists():
                     message = (
@@ -107,11 +111,11 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
                 files = {"file": Path.open(file_path, "rb")}
                 data = dict(unpacked_params.body.items())
 
+                log.info("Posting file", files=files)
                 response = requests.post(
                     task.url,
                     files=files,
                     data=data,
-                    headers=unpacked_params.headers,
                     auth=unpacked_params.auth,
                     timeout=unpacked_params.timeout,
                 )
@@ -138,4 +142,4 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
     except requests.RequestException as e:
         message = f"[ERROR] Failed to POST to {task.url}: {e!s}"
         log.exception(message)
-        return message
+        raise

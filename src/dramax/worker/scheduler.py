@@ -1,6 +1,5 @@
 from collections import defaultdict
 from datetime import datetime
-from pathlib import Path
 
 import structlog
 from pymongo.database import Database
@@ -43,13 +42,14 @@ class Scheduler:
         if len(sorted_tasks) != len(workflow.tasks):
             msg = "Some tasks are missing"
             raise ValueError(msg)
-
+        log = structlog.get_logger()
         for task_id in sorted_tasks:
+            log.info("inverted_index tasks", task_id=task_id)
             self.enqueue(task=inverted_index[task_id], workflow_id=workflow.id)
 
     def enqueue(self, task: Task, workflow_id: str) -> None:
         task_dict = task.dict()
-        self.log.debug("Enqueuing task", task_id=task.id, workflow_id=workflow_id)
+        self.log.info("Enqueuing task", task_id=task.id, workflow_id=workflow_id)
 
         TaskManager().create(
             task.id,
@@ -59,18 +59,9 @@ class Scheduler:
             **task_dict,
         )
 
-        workdir = str(
-            Path(
-                settings.data_dir,
-                task.metadata["author"],
-                workflow_id,
-                task.id,
-            ),
-        )
-
         self.log.info("Entering worker")
         worker.send_with_options(
-            args=(task_dict, workflow_id, workdir),
+            args=(task_dict, workflow_id),
             on_failure=set_failure,
             queue_name=task.options.queue_name
             or settings.default_actor_opts.queue_name,

@@ -18,11 +18,11 @@ from dramax.worker.utils import set_success, set_workflow_run_state, setup_worke
 
 broker, minio_client = setup_worker()
 
-log = get_logger()
+log = get_logger("dramax.worker")
 
 
 @dramatiq.actor(**settings.default_actor_opts.dict())
-def worker(task: dict, workflow_id: str, workdir: str) -> None:
+def worker(task: dict, workflow_id: str) -> None:
     message = CurrentMessage.get_current_message()
 
     # Conversion to Task to work easier
@@ -34,8 +34,17 @@ def worker(task: dict, workflow_id: str, workdir: str) -> None:
         task_id=parsed_task.id,
         workflow_id=workflow_id,
     )
+    workdir = str(
+        Path(
+            settings.data_dir,
+            parsed_task.metadata["author"],
+            workflow_id,
+            parsed_task.id,
+        ),
+    )
 
     log.info("Running task", task=parsed_task)
+    log.info("Work directory", workdir=workdir)
 
     Path(workdir).mkdir(parents=True, exist_ok=True)
 

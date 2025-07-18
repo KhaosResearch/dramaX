@@ -43,9 +43,9 @@ class Parameter(BaseModel):
 class UnpackedParams(BaseModel):
     method: str | None
     headers: dict[str, str] | None
-    auth: list[str] | None
-    body: dict[str, Any]
-    timeout: int = 10
+    auth: tuple[str, str] | None
+    body: dict[str, Any] | None
+    timeout: int
 
 
 class File(BaseModel):
@@ -74,6 +74,7 @@ class File(BaseModel):
         """Construye el nombre del objeto remoto para MinIO."""
         base_path = self._skip_first_dir(base)
         if self.source and self.sourcePath:
+            base_path = base_path.parent  # Pointing old task dir to retrieve input
             return str(
                 base_path
                 / self._ensure_relative(self.source)
@@ -87,7 +88,7 @@ class Task(BaseModel):
     name: str
     url: str | None
     image: str | None
-    parameters: list[dict[str, str | dict]] | None
+    parameters: list[dict[str, str | dict | list[str | dict]]] | None
     environment: dict[str, Any] | None
     inputs: list[File] = []
     outputs: list[File] = []
@@ -106,9 +107,12 @@ class Task(BaseModel):
         return name
 
     def download_inputs(self, workdir: str) -> None:
+        log = get_logger()
         for artifact in self.inputs:
             object_name = artifact.get_object_name(workdir)
             file_path = artifact.get_full_path(workdir)
+            log.info("Object_name", object_name=object_name)
+            log.info("file_path", file_path=file_path)
 
             try:
                 MinioService.get_instance().get_object(
