@@ -1,6 +1,10 @@
 from structlog import get_logger
 
-from dramax.common.exceptions import FileNotFoundForUploadError, UploadError
+from dramax.common.exceptions import (
+    FileNotFoundForUploadError,
+    InputDownloadError,
+    UploadError,
+)
 from dramax.models.dramatiq.task import Task
 from dramax.models.executor.api import api_execute
 from dramax.models.executor.docker import docker_execute
@@ -24,7 +28,7 @@ def execute_task(task: Task, workdir: str) -> str:
         if len(task.inputs) > 0:
             task.download_inputs(workdir)
 
-    except Exception as e:  #! Falta la excepcion de las carpetas
+    except InputDownloadError as e:
         log.exception("Input(s) download failed", error=e)
         raise
 
