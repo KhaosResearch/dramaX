@@ -1,5 +1,6 @@
 import docker
 
+from dramax.common.exceptions import DockerExecutionError
 from dramax.models.dramatiq.task import Task
 
 
@@ -54,6 +55,6 @@ def docker_execute(task: Task, workdir: str) -> str:
 
     if result["StatusCode"] != 0:
         error_message = f"Container failed:\n{logs}"
-        raise Exception(error_message)
+        raise DockerExecutionError(error_message)
 
     return logs

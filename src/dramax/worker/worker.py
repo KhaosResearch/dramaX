@@ -64,7 +64,7 @@ def worker(task: dict, workflow_id: str) -> None:
         log.info("Executing task")
         result = execute_task(parsed_task, workdir)
 
-    except Exception as e:  # TODO : mejorar manejo de excepciones
+    except Exception as e:
         log.exception("Task not executed properly", error=str(e))
         raise
 

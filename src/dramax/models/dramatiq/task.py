@@ -150,8 +150,8 @@ class Task(BaseModel):
             with log_file_path.open("w") as f:
                 f.write(result)
         except PermissionError as e:
-            log.info(f"Error de permisos: {e}")
-            log.info(f"Intentando escribir en: {log_file_path}")
+            log.info("Permission error: ", error=e)
+            log.info("Attempting to write to path: ", path=log_file_path)
             raise
 
         try:

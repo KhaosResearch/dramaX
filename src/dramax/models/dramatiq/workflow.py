@@ -2,9 +2,10 @@ import uuid
 from datetime import datetime
 from enum import Enum
 
-from dramax.models.dramatiq.task import Task, TaskInDatabase
 from pydantic import BaseModel, validator
 from pydantic.fields import Field
+
+from dramax.models.dramatiq.task import Task, TaskInDatabase
 
 
 class WorkflowStatus(str, Enum):
