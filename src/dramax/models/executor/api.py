@@ -102,9 +102,7 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
                 file_path = Path(artifact.get_full_path(workdir))
 
                 if not file_path.exists():
-                    message = (
-                        f"[ERROR] File to upload in POST method not found: {file_path}"
-                    )
+                    message = f"[ERROR] File to upload in POST method not found: {file_path}"  #! RAISE EXCEPTION HERE  # noqa: E501, EXE001, EXE003, EXE005
                     log.error(message)
                     return message
 
@@ -129,15 +127,32 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
             )
         response.raise_for_status()
 
-        if files:
-            files["file"].close()
+        # PARTE ACTUALIZADA DEL CÓDIGO SIN COMPROBAR
+        if task.outputs:
+            for artifact in task.outputs:
+                file_path = artifact.get_full_path(workdir)
+                Path(file_path).parent.mkdir(parents=True, exist_ok=True)
 
-        message = (
-            f"[SUCCESS] POST request completed with status {response.status_code} "
-            f"({response.reason})"
-        )
-        log.info(message)
-        return message  # noqa: TRY300
+                with Path.open(file_path, "wb") as f:
+                    f.write(response.content)
+
+            msg = (
+                f"[SUCCESS] POST response saved to {len(task.outputs)} locations "
+                f"with status {response.status_code} ({response.reason})"
+            )
+            log.info(msg)
+            return msg
+
+        # Si no hay outputs, devolver el contenido interpretado
+        content_type = response.headers.get("Content-Type", "").lower()
+        if "application/json" in content_type:
+            return response.json()
+        elif "text" in content_type:  # noqa: RET505
+            return response.text
+        else:
+            return response.content
+
+        # PARTE ACTUALIZADA DEL CÓDIGO SIN COMPROBAR
 
     except requests.RequestException as e:
         message = f"[ERROR] Failed to POST to {task.url}: {e!s}"

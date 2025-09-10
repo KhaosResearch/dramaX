@@ -28,7 +28,7 @@ tasks = [
             {
                 "method": "POST",
                 "headers": {"Content-Type": "multipart/form-data"},
-                "auth": ["user-9753", "Hapy>+'|"],
+                "auth": ["user-", "Hapy>+'|"],
             }
         ],
         inputs=[
