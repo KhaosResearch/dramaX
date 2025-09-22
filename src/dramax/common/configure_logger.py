@@ -4,7 +4,7 @@ import structlog
 
 
 def configure_logger() -> None:
-    logging.getLogger("requests").setLevel(logging.WARNING)
+    logging.getLogger("dramax.request").setLevel(logging.WARNING)
 
     logging.basicConfig(
         level=logging.INFO,

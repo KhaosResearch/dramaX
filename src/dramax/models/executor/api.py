@@ -109,7 +109,6 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
                 files = {"file": Path.open(file_path, "rb")}
                 data = dict(unpacked_params.body.items())
 
-                log.info("Posting file", files=files)
                 response = requests.post(
                     task.url,
                     files=files,

@@ -6,7 +6,7 @@ tasks = [
     Task(
         id="t1",
         name="first_task",
-        url="http://localhost:8002/download_csv",
+        url="http://localhost:8000/download_csv",
         parameters=[
             {
                 "method": "GET",
@@ -23,7 +23,7 @@ tasks = [
     Task(
         id="t2",
         name="second_task",
-        url="http://localhost:8002/calculate_spei",
+        url="http://localhost:8000/calculate_spei",
         parameters=[
             {
                 "method": "POST",
