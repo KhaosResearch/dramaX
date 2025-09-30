@@ -1,7 +1,7 @@
 version: "3"
 services:
   mongo:
-    image: mongo:6.0.6
+    image: mongo:4.4
     container_name: mongo
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
@@ -42,3 +42,7 @@ services:
       timeout: 20s
       retries: 3
     restart: always
+  dramax:
+    build: .
+    image: dramax-app
+    command: server
