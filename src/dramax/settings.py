@@ -36,7 +36,7 @@ class Settings(BaseSettings):
 
     mongo_dns: MongoDns = "mongodb://root:root@localhost:27017"
 
-    rabbit_dns: RabbitDns = "amqp://rabbit:rabbit@localhost:5672"
+    rabbit_dns: RabbitDns = "amqp://root:root@localhost:5672"
 
     minio_endpoint: str = "localhost:9000"
     minio_bucket: str = "dramax"
