@@ -142,15 +142,6 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
             log.info(msg)
             return msg
 
-        # Si no hay outputs, devolver el contenido interpretado
-        content_type = response.headers.get("Content-Type", "").lower()
-        if "application/json" in content_type:
-            return response.json()
-        elif "text" in content_type:  # noqa: RET505
-            return response.text
-        else:
-            return response.content
-
         # PARTE ACTUALIZADA DEL CÓDIGO SIN COMPROBAR
 
     except requests.RequestException as e:
