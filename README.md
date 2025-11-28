@@ -1,4 +1,4 @@
-# [dramaX](https://github.com/KhaosResearch/dramaX) 
+# [dramaX](https://github.com/KhaosResearch/dramaX)
 
 ![CI](https://github.com/KhaosResearch/dramaX/actions/workflows/ci.yml/badge.svg)
 ![Python ==3.10.2](https://img.shields.io/badge/python-%3E=3.10.2-blue.svg)
@@ -32,6 +32,14 @@ You can set up a minimal development environment using `docker compose`:
 git clone git@github.com:KhaosResearch/dramaX.git
 cd dramaX
 docker compose up -d
+```
+
+or if you are using uv:
+
+```bash
+git clone git@github.com:KhaosResearch/dramaX.git
+cd dramaX
+uv sync
 ```
 
 ## Usage

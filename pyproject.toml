@@ -2,7 +2,7 @@
 name = "dramax"
 description = "dramaX is a Python library for orchestrating distributed tasks."
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = "==3.12.*"
 authors = [
     { name = "Khaos Research Group", email = "khaos.research@gmail.com" },
 ]
@@ -78,7 +78,7 @@ exclude = '''
 )/
 '''
 
-[tool.ruff]
+[tool.ruff.lint]
 select = [
     "E",
     "W",

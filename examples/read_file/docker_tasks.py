@@ -1,5 +1,5 @@
-from dramax.models.task import Task
-from dramax.models.workflow import Workflow
+from dramax.models.dramatiq.task import Task
+from dramax.models.dramatiq.workflow import Workflow
 from dramax.worker.scheduler import Scheduler
 
 tasks = [
@@ -10,7 +10,7 @@ tasks = [
         parameters=[
             {
                 "name": "wget",
-                "value": "-P /mnt/shared/ https://raw.githubusercontent.com/solidsnack/tsv/master/cities10.tsv",
+                "value": "--output-document /mnt/shared/cities10.tsv https://raw.githubusercontent.com/solidsnack/tsv/master/cities10.tsv",
             }
         ],
         outputs=[
@@ -40,8 +40,6 @@ workflow = Workflow(
     metadata={"author": "anonymous", "other-key": "other-value"},
 )
 
-print("Workflow JSON:")
-print(workflow.json(indent=2))
 
 scheduler = Scheduler()
 scheduler.run(workflow)
