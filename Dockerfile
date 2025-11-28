@@ -1,46 +1,18 @@
-FROM debian:bullseye
+FROM ghcr.io/astral-sh/uv:python3.8-bookworm-slim
 
-ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y git
 
-RUN apt-get update && apt-get install -y \
-    build-essential \ 
-    libssl-dev \
-    zlib1g-dev \
-    libncurses5-dev \
-    libncursesw5-dev \
-    libreadline-dev \
-    libsqlite3-dev \
-    libgdbm-dev \
-    libdb5.3-dev \
-    libbz2-dev \
-    libexpat1-dev \
-    liblzma-dev \
-    tk-dev \
-    libffi-dev \
-    wget \
-    curl
+RUN groupadd --system --gid 999 agoradev \
+  && useradd  --system --gid 999 --uid 999 --create-home agoradev
 
-RUN cd /usr/src && \
-    wget https://www.python.org/ftp/python/3.10.2/Python-3.10.2.tgz && \
-    tar xzf Python-3.10.2.tgz && \
-    cd Python-3.10.2 && \
-    ./configure --enable-optimizations && \
-    make -j$(nproc) && \
-    make altinstall && \
-    update-alternatives --install /usr/bin/python python /usr/local/bin/python3.10 1 && \
-    update-alternatives --install /usr/bin/pip pip /usr/local/bin/pip3.10 1
+USER agoradev
 
-
-WORKDIR /code
+WORKDIR /dramax
 
 COPY . .
 
-RUN pip install --upgrade build
+RUN uv sync
 
-RUN python3.10 -m build
+ENV PATH="/dramax/.venv/bin/:${PATH}"
 
-RUN python3.10 -m pip install --upgrade dist/*.whl
-
-ENTRYPOINT [ "dramax" ]
-
-CMD [ "server" ]
+CMD [ "bash", "-c", "dramax server" ]
