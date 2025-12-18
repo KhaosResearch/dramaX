@@ -1,6 +1,7 @@
 .git
 __pycache__
 .venv
+uv.lock
 .env*
 tests/
 examples/

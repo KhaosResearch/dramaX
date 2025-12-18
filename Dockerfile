@@ -7,18 +7,11 @@ WORKDIR /dramax
 RUN groupadd --system --gid 999 agoradev \
   && useradd  --system --gid 999 --uid 999 --create-home agoradev
 
-RUN chown agoradev:agoradev /dramax
-RUN mkdir -p /dramax/logs && chown agoradev:agoradev /dramax/logs
-
-USER agoradev
+RUN mkdir -p /dramax/logs
 
 COPY . .
 
-USER root
-
 RUN chmod +x ./scripts/start-all.sh
-
-USER agoradev
 
 EXPOSE 8005
 
