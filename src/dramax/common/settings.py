@@ -36,8 +36,8 @@ class Settings(BaseSettings):
     api_key_name: str = "access_token"
 
     docker_registry: str = "192.168.219.5:8098"
-    docker_username: str = "khaosdev"
-    docker_password: str = "khaosdev"
+    docker_username: str
+    docker_password: str
 
     mongo_dns: MongoDns = "mongodb://root:root@localhost:27017"
 
