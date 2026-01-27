@@ -1,31 +1,45 @@
-# [dramaX](https://github.com/KhaosResearch/dramaX) 
+# [dramaX](https://github.com/KhaosResearch/dramaX)
 
 ![CI](https://github.com/KhaosResearch/dramaX/actions/workflows/ci.yml/badge.svg)
-![Python >=3.7](https://img.shields.io/badge/python-%3E=3.7-blue.svg)
+![Python ==3.10.2](https://img.shields.io/badge/python-%3E=3.10.2-blue.svg)
 ![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)
 
-`dramaX` is a distributed workflow runner for Python.
+`dramaX` is a distributed workflow runner for Python.  
 
 It uses [RabbitMQ](https://www.rabbitmq.com) as a message broker and [Dramatiq](https://dramatiq.io) as a task queue.
+
+## Considerations
+
+* Install Python 3.10.2.
+
+* Add this version of Python to the Dockerfile and call the Dockerfile from Docker Compose file.
+
+* Download the 4.4.16 image from MongoDB, as the previous version required AVX support from the CPU (these are instructions that provide capabilities to improve application performance).
+
+* In Docker Compose, change the value of the RABBITMQ_DEFAULT_USER and RABBITMQ_DEFAULT_PASS environment variables from 'rabbit' to 'root'.
 
 ## Getting Started
 
 ### Prerequisites
 
+* Python 3.10.2
+
+* Docker & Docker Compose
+
 You can set up a minimal development environment using `docker compose`:
-
-```bash
-docker compose up -d
-```
-
-### Install
-
-If you are feeling lucky and want to install the _latest version_ from source, clone the repository and install the dependencies:
 
 ```bash
 git clone git@github.com:KhaosResearch/dramaX.git
 cd dramaX
-python -m pip install -e .
+docker compose up -d
+```
+
+or if you are using uv:
+
+```bash
+git clone git@github.com:KhaosResearch/dramaX.git
+cd dramaX
+uv sync
 ```
 
 ## Usage

@@ -1,5 +1,5 @@
 import pytest
-from dramax.models.task import Task
+from dramax.models.dramatiq.task import Task
 from pydantic import ValidationError
 
 

@@ -1,15 +1,22 @@
-FROM python:3.8-slim-buster
+FROM ghcr.io/astral-sh/uv:python3.8-bookworm-slim
 
-WORKDIR /code
+RUN apt-get update && apt-get install -y git psmisc
+
+WORKDIR /dramax
+
+RUN groupadd --system --gid 999 agoradev \
+  && useradd  --system --gid 999 --uid 999 --create-home agoradev
+
+RUN mkdir -p /dramax/logs
 
 COPY . .
 
-RUN pip install --upgrade build
+RUN chmod +x ./scripts/start-all.sh
 
-RUN python3 -m build
+EXPOSE 8005
 
-RUN python3 -m pip install --upgrade dist/*.whl
+RUN uv sync
 
-ENTRYPOINT [ "dramax" ]
+ENV PATH="/dramax/.venv/bin/:${PATH}"
 
-CMD [ "server" ]
+ENTRYPOINT ["./scripts/start-all.sh"]
