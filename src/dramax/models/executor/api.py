@@ -96,26 +96,45 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
         headers = unpacked_params.headers
 
         content_type = headers.get("Content-Type").lower()
-
+        
         if "multipart/form-data" in content_type:
-            for artifact in task.inputs:
-                file_path = Path(artifact.get_full_path(workdir))
+
+            files: dict[str, tuple] = {}
+            data: dict = {}
+
+            for i, artifact in enumerate(task.inputs):
+
+                artifact_name: str = artifact.name
+
+                MAPPING_NAME: dict[str, str] = {
+                    artifact_name: f"input{i+1}"
+                }
+
+                file_path: Path = Path(artifact.get_full_path(workdir))            
+                file_name: str = MAPPING_NAME.get(artifact_name)
+                file_extension: str = file_path.suffix
 
                 if not file_path.exists():
                     message = f"[ERROR] File to upload in POST method not found: {file_path}"  #! RAISE EXCEPTION HERE  # noqa: E501, EXE001, EXE003, EXE005
                     log.error(message)
                     return message
 
-                files = {"file": Path.open(file_path, "rb")}
-                data = dict(unpacked_params.body.items())
+                if file_extension == '.csv':
+                    files[file_name] = (file_name, Path.open(file_path, "rb"), "text/csv")
+                elif file_extension in ['.json', '.geojson']:
+                    files[file_name] = (file_name, Path.open(file_path, "rb"), "application/json")
 
-                response = requests.post(
-                    task.url,
-                    files=files,
-                    data=data,
-                    auth=unpacked_params.auth,
-                    timeout=unpacked_params.timeout,
-                )
+            data = dict(unpacked_params.body.items())
+
+            response = requests.post(
+                task.url,
+                files=files,
+                data=data,
+                auth=unpacked_params.auth,
+                timeout=unpacked_params.timeout,
+            )
+            
+
         else:
             response = requests.post(
                 task.url,
@@ -124,6 +143,7 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
                 data=unpacked_params.body,
                 timeout=unpacked_params.timeout,
             )
+            
         response.raise_for_status()
 
         # PARTE ACTUALIZADA DEL CÓDIGO SIN COMPROBAR

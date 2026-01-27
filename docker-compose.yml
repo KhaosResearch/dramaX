@@ -42,3 +42,19 @@ services:
       timeout: 20s
       retries: 3
     restart: unless-stopped
+  dramax:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env.local
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp:/tmp
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8005/healthz"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
