@@ -3,6 +3,7 @@ import docker
 from dramax.common.exceptions import DockerExecutionError
 from dramax.models.dramatiq.task import Task
 
+from dramax.common.settings import settings
 
 def docker_execute(task: Task, workdir: str) -> str:
     """Runs a docker container with the given parameters.
@@ -14,6 +15,15 @@ def docker_execute(task: Task, workdir: str) -> str:
     :return: The logs of the container.
     """
     client = docker.from_env()
+    client.login(
+        registry = settings.docker_registry,
+        username = settings.docker_username,
+        password = settings.docker_password
+    )
+
+    client.images.pull(
+        task.image
+    )
 
     def create_cmd_string() -> str:
         """Builds the command to run in the container."""

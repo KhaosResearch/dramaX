@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     api_key: str = "dev"
     api_key_name: str = "access_token"
 
+    docker_registry: str = "192.168.219.5:8098"
+    docker_username: str
+    docker_password: str
+
     mongo_dns: MongoDns = "mongodb://root:root@localhost:27017"
 
     rabbit_dns: RabbitDns = "amqp://root:root@localhost:5672"
