@@ -29,9 +29,9 @@ class MinioService:
         return cls._instance
 
     def _ensure_bucket_exists(self) -> None:
-        found = self.client.bucket_exists(self.bucket)
+        found = self.client.bucket_exists(bucket_name=self.bucket)
         if not found:
-            self.client.make_bucket(self.bucket)
+            self.client.make_bucket(bucket_name=self.bucket)
             msg = f"Bucket '{self.bucket}' created."
             log.info(msg)
         else:

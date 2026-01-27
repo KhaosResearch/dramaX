@@ -1,0 +1,11 @@
+.git
+__pycache__
+.venv
+uv.lock
+.env*
+tests/
+examples/
+.pre-commit-config.yaml
+.gitignore
+
+volumes/

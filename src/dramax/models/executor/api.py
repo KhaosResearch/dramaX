@@ -7,13 +7,18 @@ from dramax.models.dramatiq.task import Task, UnpackedParams
 
 
 def unpack_parameters(param: dict) -> UnpackedParams:
+    log = get_logger()
+
+    headers_key, headers_value = param.get("headers").split(": ")
+    auth_param = tuple(param.get("auth").split(":"))
+
     return UnpackedParams(
-        method=param.get("method"),
-        headers=param.get("headers"),
+        method=param.get("method").replace("'", ""),
+        headers={headers_key.replace("'", ""): headers_value.replace("'", "")},
         timeout=param.get("timeout", 10),
-        auth=param.get("auth"),
+        auth=auth_param,
         body={
-            k: v
+            k: v.replace("'", "")
             for k, v in param.items()
             if k not in {"method", "headers", "auth", "timeout"}
         },
@@ -22,10 +27,12 @@ def unpack_parameters(param: dict) -> UnpackedParams:
 
 def api_execute(task: Task, workdir: str) -> str:
     log = get_logger()
-    params = task.parameters
-    unpacked_params = unpack_parameters(params[0])
-    log.info("Unpacked params", unpacked_params=unpacked_params)
-    method = unpacked_params.method.upper()
+    raw_params = {
+        p['name']: p['value']
+        for p in task.parameters
+    }
+    unpacked_params = unpack_parameters(raw_params)
+    method = unpacked_params.method
 
     if method == "GET":
         result = get(task, unpacked_params, workdir)
@@ -121,7 +128,7 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
                 task.url,
                 headers=headers,
                 auth=unpacked_params.auth,
-                data=unpacked_params.body,
+                json=unpacked_params.body,
                 timeout=unpacked_params.timeout,
             )
         response.raise_for_status()
