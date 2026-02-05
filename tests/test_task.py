@@ -23,6 +23,11 @@ def test_task_name_without_spaces_and_dots():
 
 def test_task_inputs_with_slash():
     try:
-        Task(id="test", name="test", image="busybox", inputs=[{"path": "taskName/rest/of/path"}])
+        Task(
+            id="test",
+            name="test",
+            image="busybox",
+            inputs=[{"path": "taskName/rest/of/path"}],
+        )
     except ValidationError:
         pytest.fail("ValidationError was not expected")
