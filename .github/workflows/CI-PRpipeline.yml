@@ -40,4 +40,9 @@ jobs:
           uv run ruff format --check .
 
       - name: Test with pytest
+        env:
+          DOCKER_USERNAME: "usuario_falso"
+          DOCKER_PASSWORD: "password_falso"
+          MINIO_ACCESS_KEY: "minio_key_falso"
+          MINIO_SECRET_KEY: "minio_secret_falso"
         run: uv run pytest
