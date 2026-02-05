@@ -1,0 +1,42 @@
+name: CI-PRPipeline
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  quality-check:
+    name: CI-PRPipeline ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-suffix: "python-${{ matrix.python-version }}"
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Lint with Ruff
+        run: |
+          echo "Running Ruff Linter..."
+          uv run ruff check .
+          
+          echo "Checking Code Formatting..."
+          uv run ruff format --check .
+
+      - name: Test with pytest
+        run: uv run pytest
