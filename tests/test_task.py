@@ -1,6 +1,7 @@
 import pytest
-from dramax.models.dramatiq.task import Task
 from pydantic import ValidationError
+
+from dramax.models.dramatiq.task import Task
 
 
 def test_task_name_with_spaces():

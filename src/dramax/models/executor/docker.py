@@ -1,9 +1,9 @@
 import docker
 
 from dramax.common.exceptions import DockerExecutionError
+from dramax.common.settings import settings
 from dramax.models.dramatiq.task import Task
 
-from dramax.common.settings import settings
 
 def docker_execute(task: Task, workdir: str) -> str:
     """Runs a docker container with the given parameters.
