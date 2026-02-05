@@ -127,9 +127,9 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
                     return message
 
                 if file_extension == '.csv':
-                    files[file_name] = (file_name, Path.open(file_path, "rb"), "text/csv")
+                    files[file_name] = (file_path.name, Path.open(file_path, "rb"), "text/csv")
                 elif file_extension in ['.json', '.geojson']:
-                    files[file_name] = (file_name, Path.open(file_path, "rb"), "application/json")
+                    files[file_name] = (file_path.name, Path.open(file_path, "rb"), "application/json")
 
             data = dict(unpacked_params.body.items())
 
@@ -140,7 +140,6 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
                 auth=unpacked_params.auth,
                 timeout=unpacked_params.timeout,
             )
-            
 
         else:
             response = requests.post(
