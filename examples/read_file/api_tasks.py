@@ -19,7 +19,7 @@ tasks = [
                 "polygon": 35,
                 "parcel": 23,
                 "start_date": "2000-01-15",
-                "end_date": "2024-12-01"
+                "end_date": "2024-12-01",
             },
         ],
         outputs=[
@@ -40,7 +40,7 @@ tasks = [
                 "target_col": "PesoNetoArticulo",
                 "date_col": "fecha",
                 "config": "Soft",
-                "delimiter": ","
+                "delimiter": ",",
             },
         ],
         inputs=[

@@ -16,14 +16,12 @@ def docker_execute(task: Task, workdir: str) -> str:
     """
     client = docker.from_env()
     client.login(
-        registry = settings.docker_registry,
-        username = settings.docker_username,
-        password = settings.docker_password
+        registry=settings.docker_registry,
+        username=settings.docker_username,
+        password=settings.docker_password,
     )
 
-    client.images.pull(
-        task.image
-    )
+    client.images.pull(task.image)
 
     def create_cmd_string() -> str:
         """Builds the command to run in the container."""
