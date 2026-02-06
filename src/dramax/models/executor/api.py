@@ -128,6 +128,12 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
                         Path.open(file_path, "rb"),
                         "application/json",
                     )
+                elif file_extension == '.zip':
+                    files[file_name] = (
+                        file_path.name,
+                        Path.open(file_path, "rb"),
+                        "application/zip",
+                    )
 
             data = dict(unpacked_params.body.items())
 
