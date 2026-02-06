@@ -7,8 +7,6 @@ from dramax.models.dramatiq.task import Task, UnpackedParams
 
 
 def unpack_parameters(param: dict) -> UnpackedParams:
-    log = get_logger()
-
     headers_key, headers_value = param.get("headers").split(": ")
     auth_param = tuple(param.get("auth").split(":"))
 
@@ -26,11 +24,7 @@ def unpack_parameters(param: dict) -> UnpackedParams:
 
 
 def api_execute(task: Task, workdir: str) -> str:
-    log = get_logger()
-    raw_params = {
-        p['name']: p['value']
-        for p in task.parameters
-    }
+    raw_params = {p["name"]: p["value"] for p in task.parameters}
     unpacked_params = unpack_parameters(raw_params)
     method = unpacked_params.method
 

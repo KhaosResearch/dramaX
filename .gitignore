@@ -57,3 +57,5 @@ dmypy.json
 
 # Volumes
 volumes/
+
+deploy.config
