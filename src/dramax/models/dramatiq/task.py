@@ -30,8 +30,8 @@ class Result(BaseModel):
 
 class Options(BaseModel):
     on_fail_force_interruption: bool = True
-    on_fail_remove_local_dir: bool = True 
-    on_finish_remove_local_dir: bool = False #TODO Check production True
+    on_fail_remove_local_dir: bool = True
+    on_finish_remove_local_dir: bool = False  # TODO Check production True
     queue_name: str | None = None
 
 
