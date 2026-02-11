@@ -87,7 +87,7 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
     log = get_logger("dramax.api_executor.post")
     log = log.bind(url=task.url, method="POST")
     headers = unpacked_params.headers
-    
+
     files: dict[str, tuple] = {}
     data: dict = {}
 
@@ -95,7 +95,7 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
         ".csv": "text/csv",
         ".json": "application/json",
         ".geojson": "application/json",
-        ".zip": "application/zip"
+        ".zip": "application/zip",
     }
 
     try:
@@ -109,7 +109,6 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
         content_type = headers.get("Content-Type").lower()
 
         if "multipart/form-data" in content_type:
-
             for i, artifact in enumerate(task.inputs):
                 artifact_name: str = artifact.name
 
@@ -123,17 +122,14 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
                     message = f"[ERROR] File to upload in POST method not found: {file_path}"  #! RAISE EXCEPTION HERE  # noqa: E501, EXE001, EXE003, EXE005
                     log.error(message)
                     return message
-                
+
                 try:
                     mime_type = MIME_TYPES[file_extension]
                 except KeyError:
-                    raise ValueError(f"Unsupported file extension: {file_extension}")
+                    msg = f"Unsupported file extension: {file_extension}"
+                    raise ValueError(msg) from None
 
-                files[file_name] = (
-                    file_path.name,
-                    file_path.open("rb"),
-                    mime_type
-                )
+                files[file_name] = (file_path.name, file_path.open("rb"), mime_type)
 
             data = dict(unpacked_params.body.items())
 
