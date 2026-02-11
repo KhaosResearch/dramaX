@@ -88,6 +88,16 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
     log = log.bind(url=task.url, method="POST")
     headers = unpacked_params.headers
 
+    files: dict[str, tuple] = {}
+    data: dict = {}
+
+    MIME_TYPES: dict[str, str] = {
+        ".csv": "text/csv",
+        ".json": "application/json",
+        ".geojson": "application/json",
+        ".zip": "application/zip",
+    }
+
     try:
         if not unpacked_params.auth:
             message = f"[ERROR] Authentication not provided for {task.url}"
@@ -99,9 +109,6 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
         content_type = headers.get("Content-Type").lower()
 
         if "multipart/form-data" in content_type:
-            files: dict[str, tuple] = {}
-            data: dict = {}
-
             for i, artifact in enumerate(task.inputs):
                 artifact_name: str = artifact.name
 
@@ -116,18 +123,13 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
                     log.error(message)
                     return message
 
-                if file_extension == ".csv":
-                    files[file_name] = (
-                        file_path.name,
-                        Path.open(file_path, "rb"),
-                        "text/csv",
-                    )
-                elif file_extension in [".json", ".geojson"]:
-                    files[file_name] = (
-                        file_path.name,
-                        Path.open(file_path, "rb"),
-                        "application/json",
-                    )
+                try:
+                    mime_type = MIME_TYPES[file_extension]
+                except KeyError:
+                    msg = f"Unsupported file extension: {file_extension}"
+                    raise ValueError(msg) from None
+
+                files[file_name] = (file_path.name, file_path.open("rb"), mime_type)
 
             data = dict(unpacked_params.body.items())
 
