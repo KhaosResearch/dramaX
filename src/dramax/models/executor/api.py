@@ -1,7 +1,7 @@
-from pathlib import Path
-from zipfile import ZipFile
-from  tempfile import TemporaryDirectory
 import shutil
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from zipfile import ZipFile
 
 import requests
 from structlog import get_logger
@@ -90,7 +90,7 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
     log = get_logger("dramax.api_executor.post")
     log = log.bind(url=task.url, method="POST")
     headers = unpacked_params.headers
-    
+
     files: dict[str, tuple] = {}
     data: dict = {}
 
@@ -126,11 +126,12 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
                     message = f"[ERROR] File to upload in POST method not found: {file_path}"  #! RAISE EXCEPTION HERE  # noqa: E501, EXE001, EXE003, EXE005
                     log.error(message)
                     return message
-                
+
                 try:
                     mime_type = MIME_INPUT_FILES_TYPES[file_extension]
                 except KeyError:
-                    raise ValueError(f"Unsupported file extension: {file_extension}")
+                    msg = f"Unsupported file extension: {file_extension}"
+                    raise ValueError(msg) from None
 
                 files[input_file_name] = (
                     file_path.name,
@@ -182,7 +183,7 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
                 destination_path = Path(workdir) / f"output{i+1}"
                 destination_path.parent.mkdir(parents=True, exist_ok=True)
                 shutil.move(str(source_path), str(destination_path))
-            
+
             msg = (
                 f"[SUCCESS] POST response saved to {len(task.outputs)} locations "
                 f"with status {response.status_code} ({response.reason})"
@@ -190,7 +191,7 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
 
             log.info(msg)
             return msg
-                
+
         else:
             # for artifact in task.outputs:
             file_path = artifact.get_full_path(workdir)
