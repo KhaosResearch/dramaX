@@ -1,4 +1,7 @@
 from pathlib import Path
+from zipfile import ZipFile
+from  tempfile import TemporaryDirectory
+import shutil
 
 import requests
 from structlog import get_logger
@@ -87,15 +90,15 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
     log = get_logger("dramax.api_executor.post")
     log = log.bind(url=task.url, method="POST")
     headers = unpacked_params.headers
-
+    
     files: dict[str, tuple] = {}
     data: dict = {}
 
-    MIME_TYPES: dict[str, str] = {
+    MIME_INPUT_FILES_TYPES: dict[str, str] = {
         ".csv": "text/csv",
         ".json": "application/json",
         ".geojson": "application/json",
-        ".zip": "application/zip",
+        ".zip": "application/zip"
     }
 
     try:
@@ -109,27 +112,31 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
         content_type = headers.get("Content-Type").lower()
 
         if "multipart/form-data" in content_type:
+
             for i, artifact in enumerate(task.inputs):
                 artifact_name: str = artifact.name
 
-                MAPPING_NAME: dict[str, str] = {artifact_name: f"input{i + 1}"}
+                MAPPING_INPUT_FILE_NAME: dict[str, str] = {artifact_name: f"input{i + 1}"}
 
                 file_path: Path = Path(artifact.get_full_path(workdir))
-                file_name: str = MAPPING_NAME.get(artifact_name)
+                input_file_name: str = MAPPING_INPUT_FILE_NAME.get(artifact_name)
                 file_extension: str = file_path.suffix
 
                 if not file_path.exists():
                     message = f"[ERROR] File to upload in POST method not found: {file_path}"  #! RAISE EXCEPTION HERE  # noqa: E501, EXE001, EXE003, EXE005
                     log.error(message)
                     return message
-
+                
                 try:
-                    mime_type = MIME_TYPES[file_extension]
+                    mime_type = MIME_INPUT_FILES_TYPES[file_extension]
                 except KeyError:
-                    msg = f"Unsupported file extension: {file_extension}"
-                    raise ValueError(msg) from None
+                    raise ValueError(f"Unsupported file extension: {file_extension}")
 
-                files[file_name] = (file_path.name, file_path.open("rb"), mime_type)
+                files[input_file_name] = (
+                    file_path.name,
+                    file_path.open("rb"),
+                    mime_type
+                )
 
             data = dict(unpacked_params.body.items())
 
@@ -153,18 +160,50 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
         response.raise_for_status()
 
         # PARTE ACTUALIZADA DEL CÓDIGO SIN COMPROBAR
-        if task.outputs:
-            for artifact in task.outputs:
-                file_path = artifact.get_full_path(workdir)
-                Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+        if task.outputs and len(task.outputs) > 1:
 
-                with Path.open(file_path, "wb") as f:
-                    f.write(response.content)
+            with TemporaryDirectory() as tmpdir:
+                zip_path = Path(tmpdir) / "response.zip"
+                zip_path.parent.mkdir(parents=True, exist_ok=True)
+
+                zip_path.write_bytes(response.content)
+
+                with ZipFile(zip_path, "r") as zip_ref:
+                    zip_ref.extractall(tmpdir)
+                    files_list = zip_ref.namelist()
+
+                extracted_files = [
+                    file for file in files_list
+                    if (tmpdir / file).is_file()
+                ]
+
+            for i, original_name in enumerate(extracted_files):
+                source_path = Path(tmpdir) / original_name
+                destination_path = Path(workdir) / f"output{i+1}"
+                destination_path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(source_path), str(destination_path))
+            
+            msg = (
+                f"[SUCCESS] POST response saved to {len(task.outputs)} locations "
+                f"with status {response.status_code} ({response.reason})"
+            )
+
+            log.info(msg)
+            return msg
+                
+        else:
+            # for artifact in task.outputs:
+            file_path = artifact.get_full_path(workdir)
+            Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+
+            with Path.open(file_path, "wb") as f:
+                f.write(response.content)
 
             msg = (
                 f"[SUCCESS] POST response saved to {len(task.outputs)} locations "
                 f"with status {response.status_code} ({response.reason})"
             )
+
             log.info(msg)
             return msg
 
