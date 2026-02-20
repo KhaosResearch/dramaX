@@ -98,7 +98,7 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
         ".csv": "text/csv",
         ".json": "application/json",
         ".geojson": "application/json",
-        ".zip": "application/zip"
+        ".zip": "application/zip",
     }
 
     try:
@@ -112,11 +112,12 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
         content_type = headers.get("Content-Type").lower()
 
         if "multipart/form-data" in content_type:
-
             for i, artifact in enumerate(task.inputs):
                 artifact_name: str = artifact.name
 
-                MAPPING_INPUT_FILE_NAME: dict[str, str] = {artifact_name: f"input{i + 1}"}
+                MAPPING_INPUT_FILE_NAME: dict[str, str] = {
+                    artifact_name: f"input{i + 1}"
+                }
 
                 file_path: Path = Path(artifact.get_full_path(workdir))
                 input_file_name: str = MAPPING_INPUT_FILE_NAME.get(artifact_name)
@@ -136,7 +137,7 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
                 files[input_file_name] = (
                     file_path.name,
                     file_path.open("rb"),
-                    mime_type
+                    mime_type,
                 )
 
             data = dict(unpacked_params.body.items())
@@ -162,7 +163,6 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
 
         # PARTE ACTUALIZADA DEL CÓDIGO SIN COMPROBAR
         if task.outputs and len(task.outputs) > 1:
-
             with TemporaryDirectory() as tmpdir:
                 zip_path = Path(tmpdir) / "response.zip"
                 zip_path.parent.mkdir(parents=True, exist_ok=True)
@@ -174,13 +174,12 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
                     files_list = zip_ref.namelist()
 
                 extracted_files = [
-                    file for file in files_list
-                    if (tmpdir / file).is_file()
+                    file for file in files_list if (tmpdir / file).is_file()
                 ]
 
             for i, original_name in enumerate(extracted_files):
                 source_path = Path(tmpdir) / original_name
-                destination_path = Path(workdir) / f"output{i+1}"
+                destination_path = Path(workdir) / f"output{i + 1}"
                 destination_path.parent.mkdir(parents=True, exist_ok=True)
                 shutil.move(str(source_path), str(destination_path))
 
