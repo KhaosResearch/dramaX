@@ -1,9 +1,8 @@
+import io
 import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from zipfile import ZipFile
-import io
-import chardet
 
 import requests
 from structlog import get_logger
@@ -165,7 +164,7 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
 
         # PARTE ACTUALIZADA DEL CÓDIGO SIN COMPROBAR
         if (len(task.outputs) > 1):
-            
+
             with TemporaryDirectory() as tmpdir:
                 tmpdir = Path(tmpdir)
 
