@@ -2,6 +2,8 @@ import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from zipfile import ZipFile
+import io
+import chardet
 
 import requests
 from structlog import get_logger
@@ -162,26 +164,23 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
         response.raise_for_status()
 
         # PARTE ACTUALIZADA DEL CÓDIGO SIN COMPROBAR
-        if task.outputs and len(task.outputs) > 1:
+        if (len(task.outputs) > 1):
+            
             with TemporaryDirectory() as tmpdir:
-                zip_path = Path(tmpdir) / "response.zip"
-                zip_path.parent.mkdir(parents=True, exist_ok=True)
+                tmpdir = Path(tmpdir)
 
-                zip_path.write_bytes(response.content)
-
-                with ZipFile(zip_path, "r") as zip_ref:
+                # Extract ZIP
+                with ZipFile(io.BytesIO(response.content)) as zip_ref:
                     zip_ref.extractall(tmpdir)
                     files_list = zip_ref.namelist()
 
-                extracted_files = [
-                    file for file in files_list if (tmpdir / file).is_file()
-                ]
-
-            for i, original_name in enumerate(extracted_files):
-                source_path = Path(tmpdir) / original_name
-                destination_path = Path(workdir) / f"output{i + 1}"
-                destination_path.parent.mkdir(parents=True, exist_ok=True)
-                shutil.move(str(source_path), str(destination_path))
+                # Mapping file names and moving files to final path
+                for i, file_name in enumerate(files_list):
+                    relative_output_path = task.outputs[i].path.lstrip("/")
+                    source_path = Path(tmpdir) / file_name
+                    destination_path = Path(workdir) / relative_output_path
+                    destination_path.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.move(str(source_path), str(destination_path))
 
             msg = (
                 f"[SUCCESS] POST response saved to {len(task.outputs)} locations "
@@ -192,12 +191,12 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
             return msg
 
         else:
-            # for artifact in task.outputs:
-            file_path = artifact.get_full_path(workdir)
-            Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+            for artifact in task.outputs:
+                file_path = artifact.get_full_path(workdir)
+                Path(file_path).parent.mkdir(parents=True, exist_ok=True)
 
-            with Path.open(file_path, "wb") as f:
-                f.write(response.content)
+                with Path.open(file_path, "wb") as f:
+                    f.write(response.content)
 
             msg = (
                 f"[SUCCESS] POST response saved to {len(task.outputs)} locations "
