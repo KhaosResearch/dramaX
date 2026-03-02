@@ -162,9 +162,10 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
 
         response.raise_for_status()
 
-
         # PARTE ACTUALIZADA DEL CÓDIGO SIN COMPROBAR
-        if (len(task.outputs) > 1) and (response.headers.get('Content-Disposition').endswith(".zip")):
+        if (len(task.outputs) > 1) and (
+            response.headers.get("Content-Disposition").endswith(".zip")
+        ):
             with TemporaryDirectory() as tmpdir:
                 tmpdir = Path(tmpdir)
 
@@ -175,8 +176,7 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
 
                 # Get files and not directories
                 files_list = [
-                    file for file in extracted_files_list
-                    if (tmpdir / file).is_file()
+                    file for file in extracted_files_list if (tmpdir / file).is_file()
                 ]
 
                 # Check that the number of files matches the expected number of outputs.
