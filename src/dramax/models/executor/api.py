@@ -165,7 +165,6 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
 
         # PARTE ACTUALIZADA DEL CÓDIGO SIN COMPROBAR
         if (len(task.outputs) > 1) and (response.headers.get('Content-Disposition').endswith(".zip")):
-                
             with TemporaryDirectory() as tmpdir:
                 tmpdir = Path(tmpdir)
 
@@ -180,7 +179,7 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
                     if (tmpdir / file).is_file()
                 ]
 
-                # Check that the number of files matches the expected number of outputs.  
+                # Check that the number of files matches the expected number of outputs.
                 if len(files_list) != len(task.outputs):
                     msg = f"ZIP contains {len(files_list)} files but {len(task.outputs)} outputs were expected"
                     log.error(msg)
