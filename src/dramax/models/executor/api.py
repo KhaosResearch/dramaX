@@ -162,7 +162,6 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
 
         response.raise_for_status()
 
-        # PARTE ACTUALIZADA DEL CÓDIGO SIN COMPROBAR
         if (len(task.outputs) > 1) and (
             response.headers.get("Content-Disposition").endswith(".zip")
         ):
