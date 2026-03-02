@@ -162,16 +162,29 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
 
         response.raise_for_status()
 
-        # PARTE ACTUALIZADA DEL CÓDIGO SIN COMPROBAR
-        if (len(task.outputs) > 1):
 
+        # PARTE ACTUALIZADA DEL CÓDIGO SIN COMPROBAR
+        if (len(task.outputs) > 1) and (response.headers.get('Content-Disposition').endswith(".zip")):
+                
             with TemporaryDirectory() as tmpdir:
                 tmpdir = Path(tmpdir)
 
                 # Extract ZIP
                 with ZipFile(io.BytesIO(response.content)) as zip_ref:
                     zip_ref.extractall(tmpdir)
-                    files_list = zip_ref.namelist()
+                    extracted_files_list = zip_ref.namelist()
+
+                # Get files and not directories
+                files_list = [
+                    file for file in extracted_files_list
+                    if (tmpdir / file).is_file()
+                ]
+
+                # Check that the number of files matches the expected number of outputs.  
+                if len(files_list) != len(task.outputs):
+                    msg = f"ZIP contains {len(files_list)} files but {len(task.outputs)} outputs were expected"
+                    log.error(msg)
+                    return msg
 
                 # Mapping file names and moving files to final path
                 for i, file_name in enumerate(files_list):
