@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/KhaosResearch/dramaX/compare/v0.2.0...v0.3.0) (2026-02-20)
+
+
+### Added
+
+* dramax receives more than 1 output api task as zip and unzips them internally ([f99add0](https://github.com/KhaosResearch/dramaX/commit/f99add03a0b21fbea5a215071ce2beabba530f2d))
+
 ## [0.2.0](https://github.com/KhaosResearch/dramaX/compare/v0.1.0...v0.2.0) (2026-01-27)
 
 
