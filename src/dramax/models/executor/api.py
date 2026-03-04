@@ -1,7 +1,8 @@
+import io
 import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from zipfile import ZipFile
+from zipfile import BadZipFile, ZipFile
 
 import requests
 from structlog import get_logger
@@ -161,43 +162,60 @@ def post(task: Task, unpacked_params: UnpackedParams, workdir: str) -> str:
 
         response.raise_for_status()
 
-        # PARTE ACTUALIZADA DEL CÓDIGO SIN COMPROBAR
-        if task.outputs and len(task.outputs) > 1:
-            with TemporaryDirectory() as tmpdir:
-                zip_path = Path(tmpdir) / "response.zip"
-                zip_path.parent.mkdir(parents=True, exist_ok=True)
+        if len(task.outputs) > 1:
+            try:
+                with TemporaryDirectory() as tmpdir:
+                    tmpdir = Path(tmpdir)
+                    # Check whether the file received in response is a zip file.
+                    with ZipFile(io.BytesIO(response.content)) as zip_ref:
+                        if zip_ref.testzip() is not None:
+                            msg = "Corrupt .zip file"
+                            log.error(msg)
+                            return msg
+                        zip_ref.extractall(tmpdir)
+                        extracted_files_list = zip_ref.namelist()
 
-                zip_path.write_bytes(response.content)
+                    # Get files and not directories
+                    files_list = [
+                        file
+                        for file in extracted_files_list
+                        if (tmpdir / file).is_file()
+                    ]
 
-                with ZipFile(zip_path, "r") as zip_ref:
-                    zip_ref.extractall(tmpdir)
-                    files_list = zip_ref.namelist()
+                    # Check that the number of files matches the expected number of outputs.
+                    if len(files_list) != len(task.outputs):
+                        msg = f"ZIP contains {len(files_list)} files but {len(task.outputs)} outputs were expected"
+                        log.error(msg)
+                        return msg
 
-                extracted_files = [
-                    file for file in files_list if (tmpdir / file).is_file()
-                ]
+                    # Mapping file names and moving files to final path
+                    for i, file_name in enumerate(files_list):
+                        relative_output_path = task.outputs[i].path.lstrip("/")
+                        source_path = Path(tmpdir) / file_name
+                        destination_path = Path(workdir) / relative_output_path
+                        destination_path.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.move(str(source_path), str(destination_path))
 
-            for i, original_name in enumerate(extracted_files):
-                source_path = Path(tmpdir) / original_name
-                destination_path = Path(workdir) / f"output{i + 1}"
-                destination_path.parent.mkdir(parents=True, exist_ok=True)
-                shutil.move(str(source_path), str(destination_path))
+                msg = (
+                    f"[SUCCESS] POST response saved to {len(task.outputs)} locations "
+                    f"with status {response.status_code} ({response.reason})"
+                )
 
-            msg = (
-                f"[SUCCESS] POST response saved to {len(task.outputs)} locations "
-                f"with status {response.status_code} ({response.reason})"
-            )
+                log.info(msg)
+                return msg
 
-            log.info(msg)
-            return msg
+            except BadZipFile as e:
+                msg = "The response content is not a valid .zip file"
+                log.error("%s: %s", msg, str(e))
+                raise IOError(msg) from None
 
         else:
-            # for artifact in task.outputs:
-            file_path = artifact.get_full_path(workdir)
-            Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+            for artifact in task.outputs:
+                file_path = artifact.get_full_path(workdir)
+                Path(file_path).parent.mkdir(parents=True, exist_ok=True)
 
-            with Path.open(file_path, "wb") as f:
-                f.write(response.content)
+                with Path.open(file_path, "wb") as f:
+                    f.write(response.content)
 
             msg = (
                 f"[SUCCESS] POST response saved to {len(task.outputs)} locations "
